@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import mimetypes
 from pathlib import Path
 from typing import Any
 
@@ -52,10 +53,14 @@ async def identify(image_path: Path) -> IdentifyResult | None:
     if settings.n8n_webhook_token:
         headers["X-Plant-Tracker-Token"] = settings.n8n_webhook_token
 
+    mime, _ = mimetypes.guess_type(image_path.name)
+    if not mime or not mime.startswith("image/"):
+        mime = "image/jpeg"
+
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             with image_path.open("rb") as fh:
-                files = {"image": (image_path.name, fh, "application/octet-stream")}
+                files = {"image": (image_path.name, fh, mime)}
                 resp = await client.post(
                     settings.n8n_identify_webhook_url,
                     files=files,

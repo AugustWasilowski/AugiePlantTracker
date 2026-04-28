@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Your plants</h1>
+
+{% if not plants %}
+  <p class="muted">No plants yet. <a href="/upload">Upload a photo</a> or <a href="/plants/new">add one manually</a>.</p>
+{% else %}
+<div class="grid">
+  {% for plant in plants %}
+  <a class="card" href="/plants/{{ plant.id }}">
+    {% if plant.latest_photo and plant.latest_photo.thumb_filename %}
+      <img src="/media/{{ plant.latest_photo.thumb_filename }}" alt="">
+    {% else %}
+      <div class="thumb-placeholder">no photo</div>
+    {% endif %}
+    <div class="card-body">
+      <strong>{{ plant.display_name }}</strong>
+      {% if plant.species %}<div class="muted small">{{ plant.species }}</div>{% endif %}
+      {% if plant.location %}<div class="muted small">📍 {{ plant.location }}</div>{% endif %}
+      <div class="muted small">{{ plant.photos|length }} photo{{ '' if plant.photos|length == 1 else 's' }}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if unassigned %}
+<h2 style="margin-top:2.5em">Unassigned photos</h2>
+<p class="muted">Photos you uploaded without picking a plant. Open one to assign it.</p>
+<div class="grid small-grid">
+  {% for photo in unassigned %}
+  <div class="card">
+    {% if photo.thumb_filename %}
+      <img src="/media/{{ photo.thumb_filename }}" alt="">
+    {% endif %}
+    <div class="card-body">
+      <div class="muted small">{{ photo.captured_at.strftime("%Y-%m-%d") }}</div>
+      {% if photo.identified_species %}
+        <div class="small">guess: {{ photo.identified_species }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

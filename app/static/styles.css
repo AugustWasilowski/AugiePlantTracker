@@ -1,0 +1,141 @@
+:root {
+  --bg: #0f1310;
+  --surface: #1a201c;
+  --surface-2: #232b25;
+  --text: #e6efe8;
+  --muted: #8aa093;
+  --accent: #6fbf73;
+  --accent-fg: #0f1310;
+  --danger: #c75050;
+  --border: #2c352f;
+  --radius: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f8f6;
+    --surface: #ffffff;
+    --surface-2: #eef2ee;
+    --text: #14201a;
+    --muted: #5a6e62;
+    --accent: #2e7d32;
+    --accent-fg: #ffffff;
+    --danger: #c62828;
+    --border: #d6ddd7;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.topbar .brand { font-weight: 700; font-size: 1.1rem; text-decoration: none; color: var(--text); }
+.topbar nav a { margin-left: 1rem; color: var(--accent); text-decoration: none; }
+.topbar nav a:hover { text-decoration: underline; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+h1 { margin-top: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+a { color: var(--accent); }
+
+.grid {
+  display: grid; gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.grid.small-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: flex; flex-direction: column;
+  transition: transform 0.1s ease;
+}
+.card:hover { transform: translateY(-2px); }
+.card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; }
+.card-body { padding: 0.75rem; }
+.thumb-placeholder {
+  aspect-ratio: 1/1;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--muted);
+}
+
+.plant-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 1rem; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.actions { display: flex; gap: 0.5rem; }
+
+.meta dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
+.meta dt { color: var(--muted); }
+.meta .block { margin-top: 1.5rem; }
+
+.timeline {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.timeline li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+.timeline img { width: 100%; border-radius: 6px; }
+.timeline-date { font-weight: 600; margin-bottom: 0.5rem; }
+.timeline-meta { margin-top: 0.5rem; }
+
+.stack { display: grid; gap: 0.85rem; max-width: 540px; }
+.stack label { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--muted); }
+.stack input, .stack select, .stack textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+.stack textarea { resize: vertical; }
+
+.btn, .btn-secondary, .btn-danger {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer; font: inherit;
+}
+.btn { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn:hover { filter: brightness(1.05); }
+.btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
+
+.danger-zone { margin-top: 3rem; }
+
+.status { font-size: 0.9rem; }
+#result img { margin-top: 1rem; }
+
+@media (max-width: 600px) {
+  .topbar { padding: 0.6rem 1rem; }
+  .container { padding: 1rem; }
+  .meta dl { grid-template-columns: 1fr; }
+  .meta dt { margin-top: 0.5rem; }
+}

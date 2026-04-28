@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if plant else "New plant" }} – Plant Tracker{% endblock %}
+{% block content %}
+<h1>{{ "Edit plant" if plant else "New plant" }}</h1>
+
+<form method="post" action="{{ action }}" class="stack">
+  <label>Nickname *
+    <input name="nickname" required value="{{ plant.nickname if plant else '' }}">
+  </label>
+  <label>Species
+    <input name="species" value="{{ plant.species or '' if plant else '' }}">
+  </label>
+  <label>Common name
+    <input name="common_name" value="{{ plant.common_name or '' if plant else '' }}">
+  </label>
+  <label>Location
+    <input name="location" placeholder="e.g. Living room window" value="{{ plant.location or '' if plant else '' }}">
+  </label>
+  <label>Pot size
+    <input name="pot_size" placeholder="e.g. 6 inch terracotta" value="{{ plant.pot_size or '' if plant else '' }}">
+  </label>
+  <label>Soil type
+    <input name="soil_type" placeholder="e.g. aroid mix" value="{{ plant.soil_type or '' if plant else '' }}">
+  </label>
+  <label>Acquired on
+    <input name="acquired_on" type="date"
+           value="{{ plant.acquired_on.strftime('%Y-%m-%d') if plant and plant.acquired_on else '' }}">
+  </label>
+  <label>Care notes
+    <textarea name="care_notes" rows="4">{{ plant.care_notes or '' if plant else '' }}</textarea>
+  </label>
+  <label>Notes
+    <textarea name="notes" rows="4">{{ plant.notes or '' if plant else '' }}</textarea>
+  </label>
+  <div>
+    <button type="submit" class="btn">Save</button>
+    {% if plant %}<a class="btn-secondary" href="/plants/{{ plant.id }}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

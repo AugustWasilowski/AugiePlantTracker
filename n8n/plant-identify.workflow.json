@@ -1,0 +1,65 @@
+{
+  "name": "Plant Identify (Claude Vision)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "plant-identify",
+        "options": {
+          "binaryData": true
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "plant-identify"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "x-api-key", "value": "={{$env.ANTHROPIC_API_KEY}}"},
+            {"name": "anthropic-version", "value": "2023-06-01"},
+            {"name": "content-type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"image\",\n          \"source\": {\n            \"type\": \"base64\",\n            \"media_type\": \"{{ $binary.image.mimeType }}\",\n            \"data\": \"{{ $binary.image.data }}\"\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"You are identifying a houseplant from a photo. Respond with ONLY a JSON object (no prose, no markdown fences) with this exact shape:\\n{\\n  \\\"species\\\": \\\"<scientific name or null>\\\",\\n  \\\"common_name\\\": \\\"<common name or null>\\\",\\n  \\\"confidence\\\": <0..1>,\\n  \\\"care_notes\\\": \\\"<2-3 sentence care summary: light, water, humidity>\\\",\\n  \\\"growth\\\": { \\\"height_cm\\\": <number or null>, \\\"leaf_count\\\": <integer or null> }\\n}\\nIf you can't tell, set fields to null and confidence to 0.\"\n        }\n      ]\n    }\n  ]\n}"
+      },
+      "id": "anthropic-1",
+      "name": "Claude Vision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pull the JSON object out of Claude's text response and forward it.\nconst msg = $input.first().json;\nconst raw = msg?.content?.[0]?.text ?? '';\n\n// Strip ```json fences if the model added them despite instructions.\nconst cleaned = raw\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```$/i, '')\n  .trim();\n\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {\n    species: null,\n    common_name: null,\n    confidence: 0,\n    care_notes: null,\n    growth: { height_cm: null, leaf_count: null },\n    _parse_error: e.message,\n    _raw: raw,\n  };\n}\nreturn [{ json: parsed }];"
+      },
+      "id": "parse-1",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Claude Vision", "type": "main", "index": 0}]]
+    },
+    "Claude Vision": {
+      "main": [[{"node": "Parse JSON", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "versionId": "1",
+  "meta": {"templateCredsSetupCompleted": false}
+}

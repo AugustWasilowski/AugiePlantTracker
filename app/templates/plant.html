@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ plant.display_name }} – Plant Tracker{% endblock %}
+{% block content %}
+<div class="plant-header">
+  <div>
+    <h1 style="margin-bottom:0">{{ plant.display_name }}</h1>
+    {% if plant.species %}<div class="muted">{{ plant.species }}{% if plant.common_name %} · {{ plant.common_name }}{% endif %}</div>{% endif %}
+  </div>
+  <div class="actions">
+    <a class="btn" href="/plants/{{ plant.id }}/edit">Edit</a>
+    <a class="btn" href="/upload?plant_id={{ plant.id }}">Add photo</a>
+  </div>
+</div>
+
+<section class="meta">
+  <dl>
+    {% if plant.location %}<dt>Location</dt><dd>{{ plant.location }}</dd>{% endif %}
+    {% if plant.pot_size %}<dt>Pot size</dt><dd>{{ plant.pot_size }}</dd>{% endif %}
+    {% if plant.soil_type %}<dt>Soil</dt><dd>{{ plant.soil_type }}</dd>{% endif %}
+    {% if plant.acquired_on %}<dt>Acquired</dt><dd>{{ plant.acquired_on.strftime("%Y-%m-%d") }}</dd>{% endif %}
+  </dl>
+  {% if plant.care_notes %}
+  <div class="block">
+    <h3>Care notes</h3>
+    <p>{{ plant.care_notes }}</p>
+  </div>
+  {% endif %}
+  {% if plant.notes %}
+  <div class="block">
+    <h3>Notes</h3>
+    <p>{{ plant.notes }}</p>
+  </div>
+  {% endif %}
+</section>
+
+<h2>Growth timeline</h2>
+{% if not plant.photos %}
+  <p class="muted">No photos yet. <a href="/upload?plant_id={{ plant.id }}">Add one →</a></p>
+{% else %}
+<ul class="timeline">
+  {% for p in plant.photos %}
+  <li>
+    <div class="timeline-date">{{ p.captured_at.strftime("%Y-%m-%d %H:%M") }}</div>
+    <a href="/media/{{ p.filename }}" target="_blank">
+      {% if p.thumb_filename %}
+        <img src="/media/{{ p.thumb_filename }}" alt="">
+      {% endif %}
+    </a>
+    <div class="timeline-meta small muted">
+      {% if p.measured_height_cm %}{{ p.measured_height_cm }} cm{% endif %}
+      {% if p.measured_leaf_count %} · {{ p.measured_leaf_count }} leaves{% endif %}
+      {% if p.identified_confidence %} · ID conf {{ "%.2f"|format(p.identified_confidence) }}{% endif %}
+    </div>
+    {% if p.caption %}<div class="small">{{ p.caption }}</div>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<form action="/plants/{{ plant.id }}/delete" method="post" class="danger-zone"
+      onsubmit="return confirm('Delete this plant and all its photos?')">
+  <button type="submit" class="btn-danger">Delete plant</button>
+</form>
+{% endblock %}

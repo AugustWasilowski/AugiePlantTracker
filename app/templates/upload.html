@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Upload photo – Plant Tracker{% endblock %}
+{% block content %}
+<h1>Upload a photo</h1>
+
+<form id="upload-form" class="stack" enctype="multipart/form-data">
+  <label>Photo
+    <!-- capture="environment" pops the rear camera straight up on phones -->
+    <input type="file" name="file" accept="image/*" capture="environment" required>
+  </label>
+  <label>Plant
+    <select name="plant_id">
+      <option value="">— New / unassigned —</option>
+      {% for p in plants %}
+      <option value="{{ p.id }}">{{ p.display_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="btn">Upload &amp; identify</button>
+</form>
+
+<div id="status" class="status muted" style="margin-top:1em"></div>
+<div id="result"></div>
+
+<script>
+const form = document.getElementById("upload-form");
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const data = new FormData(form);
+  status.textContent = "Uploading…";
+  result.innerHTML = "";
+  try {
+    const resp = await fetch("/api/photos/upload", { method: "POST", body: data });
+    if (!resp.ok) throw new Error("upload failed: " + resp.status);
+    const json = await resp.json();
+    status.textContent = "Done.";
+    let html = "";
+    if (json.thumb_filename) {
+      html += `<img src="/media/${json.thumb_filename}" style="max-width:300px;border-radius:8px">`;
+    }
+    html += `<p>Captured ${new Date(json.captured_at).toLocaleString()}</p>`;
+    const id = json.identified || {};
+    if (id.species || id.common_name) {
+      html += `<p><strong>Identified:</strong> ${id.species || ""}${id.common_name ? " (" + id.common_name + ")" : ""}`;
+      if (id.confidence) html += ` — confidence ${id.confidence.toFixed(2)}`;
+      html += `</p>`;
+    } else {
+      html += `<p class="muted">No identification result (n8n disabled or returned nothing).</p>`;
+    }
+    if (id.care_notes) html += `<p><em>${id.care_notes}</em></p>`;
+    if (json.plant_id) {
+      html += `<p><a class="btn" href="/plants/${json.plant_id}">View plant →</a></p>`;
+    } else {
+      html += `<p>Photo saved as unassigned. <a href="/">Back home</a> to attach it to a plant, or <a href="/plants/new">create a new plant</a>.</p>`;
+    }
+    result.innerHTML = html;
+  } catch (err) {
+    status.textContent = "Error: " + err.message;
+  }
+});
+</script>
+{% endblock %}

@@ -5,8 +5,7 @@
 
 <form id="upload-form" class="stack" enctype="multipart/form-data">
   <label>Photo
-    <!-- capture="environment" pops the rear camera straight up on phones -->
-    <input type="file" name="file" accept="image/*" capture="environment" required>
+    <input type="file" name="file" accept="image/*" required>
   </label>
   <label>Plant
     <select name="plant_id">
@@ -30,6 +29,7 @@ const result = document.getElementById("result");
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = new FormData(form);
+  if (!data.get("plant_id")) data.delete("plant_id");
   status.textContent = "Uploading…";
   result.innerHTML = "";
   try {

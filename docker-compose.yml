@@ -1,0 +1,27 @@
+# Plant Tracker — local LAN deployment.
+#
+# Assumes you already have an n8n container running somewhere reachable.
+# Set N8N_IDENTIFY_WEBHOOK_URL in .env to point at it. If n8n is in a
+# different compose project on the same Docker host, the easiest thing
+# is to put both on a shared external network — see the commented section
+# below.
+
+services:
+  plant-tracker:
+    build: .
+    image: plant-tracker:latest
+    container_name: plant-tracker
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data
+
+# Uncomment if you want to attach this to an existing n8n compose network:
+#
+# networks:
+#   default:
+#     name: n8n_default
+#     external: true

@@ -144,7 +144,8 @@
 <script id="photo-data" type="application/json">
 [
   {% for p in photos -%}
-  {"src": "/media/{{ p.thumb_filename or p.filename }}",
+  {"id": {{ p.id }},
+   "src": "/media/{{ p.thumb_filename or p.filename }}",
    "full": "/media/{{ p.filename }}",
    "date": "{{ p.captured_at.strftime('%b %d, %Y') }}",
    "iso":  "{{ p.captured_at.isoformat() }}",

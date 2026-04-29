@@ -16,6 +16,19 @@ router = APIRouter()
 templates: Jinja2Templates  # injected by main.py
 
 
+def _unassigned_count(db: Session) -> int:
+    return db.query(Photo).filter(Photo.plant_id.is_(None)).count()
+
+
+def _ctx(request: Request, db: Session, **extra) -> dict:
+    """Common template context — adds the inbox badge count to every page."""
+    return {
+        "request": request,
+        "unassigned_count": _unassigned_count(db),
+        **extra,
+    }
+
+
 def _form_to_plant_kwargs(
     nickname: str,
     species: Optional[str],
@@ -58,15 +71,15 @@ def index(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
     )
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "plants": plants, "unassigned": unassigned},
+        _ctx(request, db, plants=plants, unassigned=unassigned),
     )
 
 
 @router.get("/plants/new", response_class=HTMLResponse)
-def new_plant_form(request: Request) -> HTMLResponse:
+def new_plant_form(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
     return templates.TemplateResponse(
         "edit_plant.html",
-        {"request": request, "plant": None, "action": "/plants/new"},
+        _ctx(request, db, plant=None, action="/plants/new"),
     )
 
 
@@ -101,7 +114,10 @@ def plant_detail(plant_id: int, request: Request, db: Session = Depends(get_sess
     plant = db.get(Plant, plant_id)
     if plant is None:
         raise HTTPException(404, "Plant not found")
-    return templates.TemplateResponse("plant.html", {"request": request, "plant": plant})
+    return templates.TemplateResponse(
+        "plant.html",
+        _ctx(request, db, plant=plant),
+    )
 
 
 @router.get("/plants/{plant_id}/edit", response_class=HTMLResponse)
@@ -111,7 +127,7 @@ def edit_plant_form(plant_id: int, request: Request, db: Session = Depends(get_s
         raise HTTPException(404, "Plant not found")
     return templates.TemplateResponse(
         "edit_plant.html",
-        {"request": request, "plant": plant, "action": f"/plants/{plant_id}/edit"},
+        _ctx(request, db, plant=plant, action=f"/plants/{plant_id}/edit"),
     )
 
 
@@ -156,5 +172,6 @@ def delete_plant(plant_id: int, db: Session = Depends(get_session)) -> RedirectR
 def upload_form(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
     plants = db.query(Plant).order_by(Plant.nickname).all()
     return templates.TemplateResponse(
-        "upload.html", {"request": request, "plants": plants}
+        "upload.html",
+        _ctx(request, db, plants=plants),
     )

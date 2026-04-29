@@ -1,65 +1,253 @@
 {% extends "base.html" %}
 {% block title %}Upload photo – Plant Tracker{% endblock %}
 {% block content %}
-<h1>Upload a photo</h1>
 
-<form id="upload-form" class="stack" enctype="multipart/form-data">
-  <label>Photo
-    <input type="file" name="file" accept="image/*" required>
+<div class="page-head">
+  <a href="/" class="muted small" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;">
+    {% with name='back', size=14 %}{% include "_icon.html" %}{% endwith %} All plants
+  </a>
+  <h1>Add a photo</h1>
+  <div class="subtitle">We'll guess what it is. You can correct us.</div>
+</div>
+
+<form id="upload-form" enctype="multipart/form-data">
+  <label class="upload-photo-card" id="photo-card">
+    <input type="file" name="file" accept="image/*" capture="environment" required id="file-input">
+    <div class="placeholder" id="photo-placeholder">
+      {% with name='cam', size=32 %}{% include "_icon.html" %}{% endwith %}
+      <div>Tap to take a photo</div>
+      <div class="small faint">Or pick from your library</div>
+    </div>
+    <img id="photo-preview" alt="" style="display:none;">
   </label>
-  <label>Plant
-    <select name="plant_id">
-      <option value="">— New / unassigned —</option>
-      {% for p in plants %}
-      <option value="{{ p.id }}">{{ p.display_name }}</option>
+
+  {# ─── Identification (populated after upload) ─── #}
+  <div id="id-result" style="display:none;">
+    <div class="section-head" style="margin-top: 18px;">
+      <div class="section-label">Looks like…</div>
+    </div>
+    <div style="padding: 0 20px;">
+      <div id="id-card" style="padding: 14px; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+          <div>
+            <div id="id-lead" class="muted small"></div>
+            <div id="id-species" style="font-size: 18px; font-weight: 600; font-style: italic; margin-top: 2px;"></div>
+            <div id="id-common" class="muted small" style="margin-top: 2px;"></div>
+          </div>
+          <span class="conf" id="id-conf"></span>
+        </div>
+        <div id="id-care" class="muted small" style="margin-top: 10px; font-style: italic; display:none;"></div>
+        <div style="display:flex; gap:8px; margin-top: 12px;">
+          <button type="button" class="pill" id="id-confirm">
+            {% with name='check', size=14 %}{% include "_icon.html" %}{% endwith %}
+            Looks right
+          </button>
+          <button type="button" class="pill" id="id-reject">Not quite</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ─── Match to existing plant ─── #}
+  <div class="section-head" style="margin-top: 18px;">
+    <div class="section-label">Add to which plant?</div>
+  </div>
+  <div style="padding: 0 20px;">
+    {% if request.query_params.get('plant_id') %}
+      {# Pre-selected — render hidden input #}
+      <input type="hidden" name="plant_id" value="{{ request.query_params.get('plant_id') }}">
+      {% for p in plants if p.id|string == request.query_params.get('plant_id') %}
+        <div class="match-row primary">
+          <div class="thumb">
+            {% if p.latest_photo and p.latest_photo.thumb_filename %}
+              <img src="/media/{{ p.latest_photo.thumb_filename }}" alt="">
+            {% endif %}
+          </div>
+          <div class="info">
+            <div class="name">{{ p.display_name }}</div>
+            {% if p.location %}<div class="where">{{ p.location }}</div>{% endif %}
+          </div>
+          <span class="check">{% with name='check', size=18 %}{% include "_icon.html" %}{% endwith %}</span>
+        </div>
       {% endfor %}
-    </select>
-  </label>
-  <button type="submit" class="btn">Upload &amp; identify</button>
+    {% else %}
+      <div id="match-list">
+        {% for p in plants[:4] %}
+          <button type="button" class="match-row" data-plant-id="{{ p.id }}">
+            <div class="thumb">
+              {% if p.latest_photo and p.latest_photo.thumb_filename %}
+                <img src="/media/{{ p.latest_photo.thumb_filename }}" alt="">
+              {% endif %}
+            </div>
+            <div class="info">
+              <div class="name">{{ p.display_name }}</div>
+              {% if p.species %}<div class="where">{{ p.species }}</div>{% endif %}
+            </div>
+          </button>
+        {% endfor %}
+        <button type="button" class="match-row dashed" data-plant-id="">
+          {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
+          Save as a new plant
+        </button>
+      </div>
+      <input type="hidden" name="plant_id" id="plant-id-input" value="">
+    {% endif %}
+  </div>
+
+  {# ─── Quick measurements ─── #}
+  <div class="field-group">
+    <div class="group-label">Quick measurements <span class="muted" style="font-weight:400; text-transform:none; letter-spacing:0;">· optional</span></div>
+    <div class="field-row">
+      <div class="field">
+        <label class="label" for="m-h">Height (cm)</label>
+        <input id="m-h" name="height_cm" type="number" step="0.5" inputmode="decimal" placeholder="—">
+        <div class="hint" id="hint-h" style="display:none;">Last: <span class="accent" id="hint-h-val"></span></div>
+      </div>
+      <div class="field">
+        <label class="label" for="m-l">Leaves</label>
+        <input id="m-l" name="leaf_count" type="number" inputmode="numeric" placeholder="—">
+        <div class="hint" id="hint-l" style="display:none;">Last: <span class="accent" id="hint-l-val"></span></div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="m-cap">Caption (optional)</label>
+      <input id="m-cap" name="caption" placeholder="Repotted into 8&quot; terracotta">
+      <div class="hint">Captions show up in the journal.</div>
+    </div>
+  </div>
+
+  <div class="form-footer">
+    <button type="submit" class="btn" id="save-btn">Save photo</button>
+    <a class="btn-secondary" href="/">Cancel</a>
+  </div>
 </form>
 
-<div id="status" class="status muted" style="margin-top:1em"></div>
+<div id="status"></div>
 <div id="result"></div>
 
-<script>
-const form = document.getElementById("upload-form");
-const status = document.getElementById("status");
-const result = document.getElementById("result");
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const data = new FormData(form);
-  if (!data.get("plant_id")) data.delete("plant_id");
-  status.textContent = "Uploading…";
-  result.innerHTML = "";
-  try {
-    const resp = await fetch("/api/photos/upload", { method: "POST", body: data });
-    if (!resp.ok) throw new Error("upload failed: " + resp.status);
-    const json = await resp.json();
-    status.textContent = "Done.";
-    let html = "";
-    if (json.thumb_filename) {
-      html += `<img src="/media/${json.thumb_filename}" style="max-width:300px;border-radius:8px">`;
-    }
-    html += `<p>Captured ${new Date(json.captured_at).toLocaleString()}</p>`;
-    const id = json.identified || {};
-    if (id.species || id.common_name) {
-      html += `<p><strong>Identified:</strong> ${id.species || ""}${id.common_name ? " (" + id.common_name + ")" : ""}`;
-      if (id.confidence) html += ` — confidence ${id.confidence.toFixed(2)}`;
-      html += `</p>`;
-    } else {
-      html += `<p class="muted">No identification result (n8n disabled or returned nothing).</p>`;
-    }
-    if (id.care_notes) html += `<p><em>${id.care_notes}</em></p>`;
-    if (json.plant_id) {
-      html += `<p><a class="btn" href="/plants/${json.plant_id}">View plant →</a></p>`;
-    } else {
-      html += `<p>Photo saved as unassigned. <a href="/">Back home</a> to attach it to a plant, or <a href="/plants/new">create a new plant</a>.</p>`;
-    }
-    result.innerHTML = html;
-  } catch (err) {
-    status.textContent = "Error: " + err.message;
-  }
-});
+<script id="plants-data" type="application/json">
+{% set rows = [] -%}
+{%- for p in plants -%}
+  {%- set last = p.latest_photo -%}
+  {%- set _ = rows.append({
+    'id': p.id,
+    'name': p.display_name,
+    'species': p.species or '',
+    'last_h': last.measured_height_cm if last and last.measured_height_cm else None,
+    'last_l': last.measured_leaf_count if last and last.measured_leaf_count else None,
+  }) -%}
+{%- endfor -%}
+{{ rows|tojson }}
 </script>
+<script>
+(function () {
+  const form = document.getElementById('upload-form');
+  const fileInput = document.getElementById('file-input');
+  const placeholder = document.getElementById('photo-placeholder');
+  const preview = document.getElementById('photo-preview');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const idResult = document.getElementById('id-result');
+  const matchList = document.getElementById('match-list');
+  const plantInput = document.getElementById('plant-id-input');
+  const plants = JSON.parse(document.getElementById('plants-data').textContent);
+
+  // Local preview
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    preview.src = url; preview.style.display = 'block';
+    placeholder.style.display = 'none';
+  });
+
+  // Match-list selection
+  if (matchList) {
+    matchList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.match-row');
+      if (!btn) return;
+      matchList.querySelectorAll('.match-row').forEach(r => r.classList.remove('primary'));
+      btn.classList.add('primary');
+      plantInput.value = btn.dataset.plantId || '';
+      // Show prefilled measurements if we have last values
+      const p = plants.find(p => String(p.id) === String(btn.dataset.plantId));
+      const hH = document.getElementById('hint-h'), hL = document.getElementById('hint-l');
+      if (p && p.last_h) {
+        document.getElementById('hint-h-val').textContent = p.last_h + ' cm';
+        hH.style.display = 'block';
+      } else { hH.style.display = 'none'; }
+      if (p && p.last_l) {
+        document.getElementById('hint-l-val').textContent = p.last_l + ' leaves';
+        hL.style.display = 'block';
+      } else { hL.style.display = 'none'; }
+    });
+  }
+
+  function setConf(c) {
+    const chip = document.getElementById('id-conf');
+    chip.classList.remove('conf-likely','conf-maybe','conf-unsure','conf-none');
+    if (c === null || c === undefined) {
+      chip.classList.add('conf-none'); chip.textContent = '—'; return 'Possibly';
+    }
+    if (c >= 0.85) { chip.classList.add('conf-likely'); chip.textContent = 'Likely'; return 'Looks like'; }
+    if (c >= 0.55) { chip.classList.add('conf-maybe');  chip.textContent = 'Maybe';  return 'Could be'; }
+    chip.classList.add('conf-unsure'); chip.textContent = 'Unsure'; return 'Possibly';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData();
+    data.append('file', fileInput.files[0]);
+    const pid = (form.querySelector('[name=plant_id]') || {}).value || plantInput.value;
+    if (pid) data.append('plant_id', pid);
+    const cap = document.getElementById('m-cap').value;
+    const h = document.getElementById('m-h').value;
+    const l = document.getElementById('m-l').value;
+    if (cap) data.append('caption', cap);
+    if (h) data.append('height_cm', h);
+    if (l) data.append('leaf_count', l);
+
+    status.textContent = 'Uploading…';
+    try {
+      const resp = await fetch('/api/photos/upload', { method: 'POST', body: data });
+      if (!resp.ok) throw new Error('upload failed: ' + resp.status);
+      const json = await resp.json();
+      status.textContent = '';
+
+      // Show inline ID result
+      const id = json.identified || {};
+      if (id.species || id.common_name) {
+        const lead = setConf(id.confidence ?? null);
+        document.getElementById('id-lead').textContent = lead + '…';
+        document.getElementById('id-species').textContent = id.species || '';
+        document.getElementById('id-common').textContent = id.common_name || '';
+        if (id.care_notes) {
+          const c = document.getElementById('id-care');
+          c.textContent = id.care_notes; c.style.display = 'block';
+        }
+        idResult.style.display = 'block';
+      }
+
+      if (json.plant_id) {
+        // Hop to the plant
+        location.href = '/plants/' + json.plant_id;
+      } else {
+        result.innerHTML = '<p class="muted">Saved as unassigned. <a href="/">Back to home</a> to attach it, or <a href="/plants/new">create a new plant</a>.</p>';
+      }
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+    }
+  });
+
+  // Confirm/reject ID — UX only for now; backend already saved.
+  document.getElementById('id-confirm')?.addEventListener('click', () => {
+    document.getElementById('id-card').style.opacity = '0.6';
+    document.getElementById('id-confirm').textContent = 'Confirmed ✓';
+  });
+  document.getElementById('id-reject')?.addEventListener('click', () => {
+    idResult.style.display = 'none';
+  });
+})();
+</script>
+
 {% endblock %}

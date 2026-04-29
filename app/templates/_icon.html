@@ -1,0 +1,23 @@
+{# Reusable icon partial. Usage: {% include "_icon.html" with context %}
+   Set `name` to one of: inbox, plus, edit, cam, search, back, fwd, close,
+   check, drop, ruler, leaf, sun, pot, loc, cal, more, chev, drag, compare,
+   filter, trash. Optional `size` (default 18). #}
+{% set _size = size or 18 %}
+{% set _paths = {
+  'inbox':   'M3 12l3-7h12l3 7M3 12v7a1 1 0 001 1h16a1 1 0 001-1v-7M3 12h5l1 2h6l1-2h5',
+  'plus':    'M12 5v14M5 12h14',
+  'edit':    'M4 20h4l10-10-4-4L4 16v4z',
+  'cam':     'M4 8h3l2-2h6l2 2h3v11H4z M12 17a4 4 0 100-8 4 4 0 000 8z',
+  'search':  'M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3',
+  'back':    'M15 18l-6-6 6-6',
+  'check':   'M5 12l5 5L20 7',
+  'pot':     'M5 11h14l-1 9H6l-1-9zM5 11l1-3h12l1 3M9 15v3M15 15v3',
+  'loc':     'M12 21s7-7 7-12a7 7 0 10-14 0c0 5 7 12 7 12zM12 11a2 2 0 100-4 2 2 0 000 4z',
+  'cal':     'M4 6h16v14H4zM4 10h16M9 4v4M15 4v4',
+  'more':    'M5 12h.01M12 12h.01M19 12h.01',
+  'compare': 'M9 4v16M3 8h6M3 14h6M15 4v16M15 9l3 3-3 3M21 12h-6',
+  'filter':  'M4 5h16l-6 8v6l-4-2v-4L4 5z',
+  'trash':   'M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6',
+  'leaf':    'M5 19c8 0 14-6 14-14 0 0-9 0-13 4S5 19 5 19zM5 19l8-8',
+  'sprout':  'M12 21V11M12 11C12 8 9 6 6 7 7 10 9 11 12 11ZM12 11C12 8 15 6 18 7 17 10 15 11 12 11Z',
+} %}<svg width="{{ _size }}" height="{{ _size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ _paths[name] }}"/></svg>

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -34,7 +34,9 @@ class Plant(Base):
     photos: Mapped[list["Photo"]] = relationship(
         back_populates="plant",
         cascade="all, delete-orphan",
-        order_by="Photo.captured_at.desc()",
+        # Ascending by capture date so the timeline reads left-to-right and
+        # the scrubber index 0 is the *first* photo, len-1 is the latest.
+        order_by="Photo.captured_at.asc()",
     )
 
     @property
@@ -43,7 +45,17 @@ class Plant(Base):
 
     @property
     def latest_photo(self) -> Optional["Photo"]:
-        return self.photos[0] if self.photos else None
+        return self.photos[-1] if self.photos else None
+
+    @property
+    def milestones(self) -> list["Photo"]:
+        """Photos flagged is_milestone (or with a non-empty caption), newest first.
+
+        Drives the journal feed under the scrubber.
+        """
+        out = [p for p in self.photos if p.is_milestone or (p.caption or "").strip()]
+        out.sort(key=lambda p: p.captured_at, reverse=True)
+        return out
 
 
 class Photo(Base):
@@ -70,4 +82,34 @@ class Photo(Base):
 
     caption: Mapped[Optional[str]] = mapped_column(Text)
 
+    # NEW: marks a photo as a journal-worthy moment (repotted, first flower,
+    # moved rooms, etc.). Surfaces in the "Journal" feed on the plant detail
+    # page even if no caption is set.
+    is_milestone: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     plant: Mapped[Optional[Plant]] = relationship(back_populates="photos")
+
+    @property
+    def confidence_word(self) -> str:
+        """Plain-English confidence label for the UI."""
+        c = self.identified_confidence
+        if c is None:
+            return ""
+        if c >= 0.85:
+            return "Likely"
+        if c >= 0.55:
+            return "Maybe"
+        if c > 0:
+            return "Unsure"
+        return ""
+
+    @property
+    def confidence_lead(self) -> str:
+        c = self.identified_confidence
+        if c is None or c <= 0:
+            return ""
+        if c >= 0.85:
+            return "Looks like"
+        if c >= 0.55:
+            return "Could be"
+        return "Possibly"

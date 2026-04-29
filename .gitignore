@@ -7,3 +7,4 @@ data/
 *.sqlite-journal
 .venv/
 .DS_Store
+.claude/

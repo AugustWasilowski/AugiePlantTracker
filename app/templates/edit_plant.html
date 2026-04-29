@@ -1,40 +1,97 @@
 {% extends "base.html" %}
-{% block title %}{{ "Edit" if plant else "New plant" }} – Plant Tracker{% endblock %}
+{% block title %}{{ "Edit " + plant.display_name if plant else "New plant" }} – Plant Tracker{% endblock %}
 {% block content %}
-<h1>{{ "Edit plant" if plant else "New plant" }}</h1>
 
-<form method="post" action="{{ action }}" class="stack">
-  <label>Nickname *
-    <input name="nickname" required value="{{ plant.nickname if plant else '' }}">
-  </label>
-  <label>Species
-    <input name="species" value="{{ plant.species or '' if plant else '' }}">
-  </label>
-  <label>Common name
-    <input name="common_name" value="{{ plant.common_name or '' if plant else '' }}">
-  </label>
-  <label>Location
-    <input name="location" placeholder="e.g. Living room window" value="{{ plant.location or '' if plant else '' }}">
-  </label>
-  <label>Pot size
-    <input name="pot_size" placeholder="e.g. 6 inch terracotta" value="{{ plant.pot_size or '' if plant else '' }}">
-  </label>
-  <label>Soil type
-    <input name="soil_type" placeholder="e.g. aroid mix" value="{{ plant.soil_type or '' if plant else '' }}">
-  </label>
-  <label>Acquired on
-    <input name="acquired_on" type="date"
-           value="{{ plant.acquired_on.strftime('%Y-%m-%d') if plant and plant.acquired_on else '' }}">
-  </label>
-  <label>Care notes
-    <textarea name="care_notes" rows="4">{{ plant.care_notes or '' if plant else '' }}</textarea>
-  </label>
-  <label>Notes
-    <textarea name="notes" rows="4">{{ plant.notes or '' if plant else '' }}</textarea>
-  </label>
-  <div>
+<div class="page-head">
+  <a href="{% if plant %}/plants/{{ plant.id }}{% else %}/{% endif %}"
+     class="muted small" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;">
+    {% with name='back', size=14 %}{% include "_icon.html" %}{% endwith %}
+    {% if plant %}Back to {{ plant.nickname }}{% else %}All plants{% endif %}
+  </a>
+  <h1>{{ "Edit plant" if plant else "New plant" }}</h1>
+</div>
+
+<form method="post" action="{{ action }}">
+
+  <div class="field-group">
+    <div class="group-label">Identity</div>
+    <div class="field">
+      <label class="label" for="f-nickname">Nickname <span class="req">*</span></label>
+      <input id="f-nickname" name="nickname" required value="{{ plant.nickname if plant else '' }}">
+      <div class="hint">What you actually call them. Frank, Susan, etc.</div>
+    </div>
+    <div class="field">
+      <label class="label" for="f-species">Species</label>
+      <input id="f-species" name="species" placeholder="Monstera deliciosa"
+             value="{{ plant.species or '' if plant else '' }}">
+    </div>
+    <div class="field">
+      <label class="label" for="f-common">Common name</label>
+      <input id="f-common" name="common_name" placeholder="Swiss cheese plant"
+             value="{{ plant.common_name or '' if plant else '' }}">
+    </div>
+  </div>
+
+  <div class="field-group">
+    <div class="group-label">Where it lives</div>
+    <div class="field">
+      <label class="label" for="f-loc">Location</label>
+      <input id="f-loc" name="location" placeholder="Living room window"
+             value="{{ plant.location or '' if plant else '' }}">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label class="label" for="f-pot">Pot size</label>
+        <input id="f-pot" name="pot_size" placeholder="6 in terracotta"
+               value="{{ plant.pot_size or '' if plant else '' }}">
+      </div>
+      <div class="field">
+        <label class="label" for="f-soil">Soil</label>
+        <input id="f-soil" name="soil_type" placeholder="aroid mix"
+               value="{{ plant.soil_type or '' if plant else '' }}">
+      </div>
+    </div>
+    <div class="field">
+      <label class="label" for="f-acq">Acquired on</label>
+      <input id="f-acq" name="acquired_on" type="date"
+             value="{{ plant.acquired_on.strftime('%Y-%m-%d') if plant and plant.acquired_on else '' }}">
+    </div>
+  </div>
+
+  <div class="field-group">
+    <div class="group-label">Care</div>
+    <div class="field">
+      <label class="label" for="f-care">Care notes</label>
+      <textarea id="f-care" name="care_notes" rows="3"
+                placeholder="Bright indirect, water when top inch dries.">{{ plant.care_notes or '' if plant else '' }}</textarea>
+    </div>
+    <div class="field">
+      <label class="label" for="f-notes">Free-form notes</label>
+      <textarea id="f-notes" name="notes" rows="3"
+                placeholder="Anything to remember.">{{ plant.notes or '' if plant else '' }}</textarea>
+    </div>
+  </div>
+
+  {% if plant %}
+  <div class="danger-zone">
+    <div class="group-label">Danger zone</div>
+    <p class="muted small" style="margin: 0 0 10px;">Deleting removes the plant and all its photos. No undo.</p>
+    <button type="button" class="btn-danger" onclick="
+      if (confirm('Delete {{ plant.nickname }} and all photos? This cannot be undone.')) {
+        const f = document.createElement('form');
+        f.method='post'; f.action='/plants/{{ plant.id }}/delete';
+        document.body.appendChild(f); f.submit();
+      }">
+      {% with name='trash', size=14 %}{% include "_icon.html" %}{% endwith %}
+      Delete {{ plant.nickname }}
+    </button>
+  </div>
+  {% endif %}
+
+  <div class="form-footer">
     <button type="submit" class="btn">Save</button>
     {% if plant %}<a class="btn-secondary" href="/plants/{{ plant.id }}">Cancel</a>{% endif %}
   </div>
 </form>
+
 {% endblock %}

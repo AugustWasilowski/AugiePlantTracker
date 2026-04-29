@@ -28,6 +28,10 @@ def _make_thumb_path(photo_path: Path) -> Path:
 async def upload_photo(
     file: UploadFile = File(...),
     plant_id: Optional[int] = Form(None),
+    caption: Optional[str] = Form(None),
+    height_cm: Optional[float] = Form(None),
+    leaf_count: Optional[int] = Form(None),
+    is_milestone: Optional[bool] = Form(False),
     db: Session = Depends(get_session),
 ):
     """Accept an image upload, persist it, optionally call n8n for ID, return record."""
@@ -54,6 +58,11 @@ async def upload_photo(
             raise HTTPException(400, f"Unknown plant_id {plant_id}")
 
     growth = ident.growth if ident else {}
+    # User-supplied measurements win over the LLM's guess.
+    h_cm = height_cm if height_cm is not None else growth.get("height_cm")
+    l_ct = leaf_count if leaf_count is not None else growth.get("leaf_count")
+
+    cap = (caption or "").strip() or None
     photo = Photo(
         plant_id=plant_id,
         filename=storage.relative(saved),
@@ -65,8 +74,10 @@ async def upload_photo(
         identified_common_name=(ident.common_name if ident else None),
         identified_confidence=(ident.confidence if ident else None),
         identified_raw=json.dumps(dict(ident)) if ident else None,
-        measured_height_cm=growth.get("height_cm"),
-        measured_leaf_count=growth.get("leaf_count"),
+        measured_height_cm=h_cm,
+        measured_leaf_count=l_ct,
+        caption=cap,
+        is_milestone=bool(is_milestone) or bool(cap),
     )
     db.add(photo)
     db.commit()
@@ -115,6 +126,7 @@ def update_measurements(
     height_cm: Optional[float] = Form(None),
     leaf_count: Optional[int] = Form(None),
     caption: Optional[str] = Form(None),
+    is_milestone: Optional[bool] = Form(None),
     db: Session = Depends(get_session),
 ):
     photo = db.get(Photo, photo_id)
@@ -126,6 +138,8 @@ def update_measurements(
         photo.measured_leaf_count = leaf_count
     if caption is not None:
         photo.caption = caption
+    if is_milestone is not None:
+        photo.is_milestone = bool(is_milestone)
     db.commit()
     return {"ok": True}
 

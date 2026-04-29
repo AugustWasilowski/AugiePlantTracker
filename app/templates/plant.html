@@ -1,64 +1,206 @@
 {% extends "base.html" %}
 {% block title %}{{ plant.display_name }} – Plant Tracker{% endblock %}
 {% block content %}
-<div class="plant-header">
-  <div>
-    <h1 style="margin-bottom:0">{{ plant.display_name }}</h1>
-    {% if plant.species %}<div class="muted">{{ plant.species }}{% if plant.common_name %} · {{ plant.common_name }}{% endif %}</div>{% endif %}
-  </div>
-  <div class="actions">
-    <a class="btn" href="/plants/{{ plant.id }}/edit">Edit</a>
-    <a class="btn" href="/upload?plant_id={{ plant.id }}">Add photo</a>
-  </div>
+
+<div class="page-head plant-detail-head">
+  <a href="/" class="muted small" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;">
+    {% with name='back', size=14 %}{% include "_icon.html" %}{% endwith %} All plants
+  </a>
+  <h1>{{ plant.display_name }}</h1>
+  {% if plant.species %}
+    <div class="species">
+      <em>{{ plant.species }}</em>{% if plant.common_name %} · {{ plant.common_name }}{% endif %}
+    </div>
+  {% endif %}
 </div>
 
-<section class="meta">
-  <dl>
-    {% if plant.location %}<dt>Location</dt><dd>{{ plant.location }}</dd>{% endif %}
-    {% if plant.pot_size %}<dt>Pot size</dt><dd>{{ plant.pot_size }}</dd>{% endif %}
-    {% if plant.soil_type %}<dt>Soil</dt><dd>{{ plant.soil_type }}</dd>{% endif %}
-    {% if plant.acquired_on %}<dt>Acquired</dt><dd>{{ plant.acquired_on.strftime("%Y-%m-%d") }}</dd>{% endif %}
-  </dl>
-  {% if plant.care_notes %}
-  <div class="block">
-    <h3>Care notes</h3>
-    <p>{{ plant.care_notes }}</p>
-  </div>
-  {% endif %}
-  {% if plant.notes %}
-  <div class="block">
-    <h3>Notes</h3>
-    <p>{{ plant.notes }}</p>
-  </div>
-  {% endif %}
-</section>
+{# ─── Hero photo + scrubber ────────────────────────────────────── #}
+{% set photos = plant.photos %}
+{% set n = photos|length %}
 
-<h2>Growth timeline</h2>
-{% if not plant.photos %}
-  <p class="muted">No photos yet. <a href="/upload?plant_id={{ plant.id }}">Add one →</a></p>
-{% else %}
-<ul class="timeline">
-  {% for p in plant.photos %}
-  <li>
-    <div class="timeline-date">{{ p.captured_at.strftime("%Y-%m-%d %H:%M") }}</div>
-    <a href="/media/{{ p.filename }}" target="_blank">
-      {% if p.thumb_filename %}
-        <img src="/media/{{ p.thumb_filename }}" alt="">
-      {% endif %}
+{% if n == 0 %}
+  <div class="empty-block" style="margin: 0 16px;">
+    <svg width="100" height="100" viewBox="0 0 200 200" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="40" y="60" width="120" height="100" rx="8"/>
+      <circle cx="100" cy="115" r="24"/>
+      <path d="M70 60l8-12h44l8 12"/>
+      <path d="M150 90 Q160 80 170 86 Q160 90 152 96"/>
+    </svg>
+    <div class="title">No photos of {{ plant.nickname }} yet.</div>
+    <div class="body">A plant without photos is just a rumor.</div>
+    <a class="btn" href="/upload?plant_id={{ plant.id }}">
+      {% with name='cam', size=14 %}{% include "_icon.html" %}{% endwith %}
+      Take one now
     </a>
-    <div class="timeline-meta small muted">
-      {% if p.measured_height_cm %}{{ p.measured_height_cm }} cm{% endif %}
-      {% if p.measured_leaf_count %} · {{ p.measured_leaf_count }} leaves{% endif %}
-      {% if p.identified_confidence %} · ID conf {{ "%.2f"|format(p.identified_confidence) }}{% endif %}
+  </div>
+{% else %}
+  <div class="hero-photo" id="hero">
+    {% set last = photos[n-1] %}
+    <img id="hero-img" src="/media/{{ last.thumb_filename or last.filename }}" alt="">
+    <div class="date-chip" id="hero-date">
+      {{ last.captured_at.strftime('%b %d, %Y') }}
     </div>
-    {% if p.caption %}<div class="small">{{ p.caption }}</div>{% endif %}
-  </li>
-  {% endfor %}
-</ul>
+  </div>
+
+  {% if n > 1 %}
+  <div class="scrubber-wrap">
+    <input type="range" class="scrubber" id="scrub"
+           min="0" max="{{ n - 1 }}" value="{{ n - 1 }}" step="1"
+           aria-label="Scrub through photos over time">
+    <div class="scrubber-labels">
+      <span>{{ photos[0].captured_at.strftime('%b %Y') }}</span>
+      <span>{{ photos[n-1].captured_at.strftime('%b %Y') }}</span>
+    </div>
+    <div class="scrubber-meta">
+      <span class="tabular" id="scrub-counter">{{ n }} of {{ n }}</span>
+      <span class="tabular muted" id="scrub-elapsed">today</span>
+    </div>
+  </div>
+  {% endif %}
 {% endif %}
 
-<form action="/plants/{{ plant.id }}/delete" method="post" class="danger-zone"
-      onsubmit="return confirm('Delete this plant and all its photos?')">
-  <button type="submit" class="btn-danger">Delete plant</button>
-</form>
+{# ─── Identity / where it lives ────────────────────────────────── #}
+<div class="meta-card">
+  {% if plant.location %}
+  <div class="meta-row">
+    <span class="icon">{% with name='loc', size=16 %}{% include "_icon.html" %}{% endwith %}</span>
+    <span class="label">Lives in</span>
+    <span class="value">{{ plant.location }}</span>
+  </div>
+  {% endif %}
+  {% if plant.pot_size %}
+  <div class="meta-row">
+    <span class="icon">{% with name='pot', size=16 %}{% include "_icon.html" %}{% endwith %}</span>
+    <span class="label">Pot</span>
+    <span class="value">{{ plant.pot_size }}</span>
+  </div>
+  {% endif %}
+  {% if plant.soil_type %}
+  <div class="meta-row">
+    <span class="icon">{% with name='leaf', size=16 %}{% include "_icon.html" %}{% endwith %}</span>
+    <span class="label">Soil</span>
+    <span class="value">{{ plant.soil_type }}</span>
+  </div>
+  {% endif %}
+  {% if plant.acquired_on %}
+  <div class="meta-row">
+    <span class="icon">{% with name='cal', size=16 %}{% include "_icon.html" %}{% endwith %}</span>
+    <span class="label">With me since</span>
+    <span class="value">{{ plant.acquired_on.strftime('%b %Y') }}</span>
+  </div>
+  {% endif %}
+</div>
+
+{% if plant.care_notes %}
+<div class="section-head" style="margin-top: 18px;">
+  <div class="section-label">Care</div>
+</div>
+<div class="care-block">
+  <p>{{ plant.care_notes }}</p>
+</div>
+{% endif %}
+
+{# ─── Journal feed ─────────────────────────────────────────────── #}
+<div class="section-head" style="margin-top: 18px;">
+  <div class="section-label">Journal</div>
+  <a class="small muted" href="/upload?plant_id={{ plant.id }}">+ Add entry</a>
+</div>
+<div class="journal">
+  {% set milestones = plant.milestones %}
+  {% if milestones %}
+    {% for m in milestones %}
+      <button class="journal-entry" type="button" data-photo-id="{{ m.id }}"
+              data-src="/media/{{ m.thumb_filename or m.filename }}"
+              data-date="{{ m.captured_at.strftime('%b %d, %Y') }}">
+        <div class="pic">
+          {% if m.thumb_filename %}<img src="/media/{{ m.thumb_filename }}" alt="">{% endif %}
+        </div>
+        <div>
+          <div class="when">{{ m.captured_at.strftime('%b %d, %Y') }}</div>
+          <div class="note">{{ m.caption or 'Milestone photo' }}</div>
+        </div>
+      </button>
+    {% endfor %}
+  {% else %}
+    <div class="journal-entry empty">No journal entries yet — caption a photo or mark it a milestone.</div>
+  {% endif %}
+</div>
+
+{# ─── Footer actions ───────────────────────────────────────────── #}
+<div style="display:flex; gap:8px; padding: 8px 20px 32px;">
+  <a class="pill" href="/plants/{{ plant.id }}/edit">
+    {% with name='edit', size=14 %}{% include "_icon.html" %}{% endwith %}
+    Edit
+  </a>
+  <a class="pill" href="/upload?plant_id={{ plant.id }}">
+    {% with name='cam', size=14 %}{% include "_icon.html" %}{% endwith %}
+    Add photo
+  </a>
+</div>
+
+{# ─── Scrubber JS — vanilla, no deps ───────────────────────────── #}
+{% if n > 1 %}
+<script id="photo-data" type="application/json">
+[
+  {% for p in photos -%}
+  {"src": "/media/{{ p.thumb_filename or p.filename }}",
+   "full": "/media/{{ p.filename }}",
+   "date": "{{ p.captured_at.strftime('%b %d, %Y') }}",
+   "iso":  "{{ p.captured_at.isoformat() }}",
+   "caption": {{ (p.caption or '')|tojson }}}{{ ", " if not loop.last }}
+  {%- endfor %}
+]
+</script>
+<script>
+(function () {
+  const photos  = JSON.parse(document.getElementById('photo-data').textContent);
+  const scrub   = document.getElementById('scrub');
+  const heroImg = document.getElementById('hero-img');
+  const heroDt  = document.getElementById('hero-date');
+  const counter = document.getElementById('scrub-counter');
+  const elapsed = document.getElementById('scrub-elapsed');
+  const total   = photos.length;
+  const latest  = new Date(photos[total - 1].iso);
+
+  function fmtElapsed(iso) {
+    const t = new Date(iso);
+    const days = Math.round((latest - t) / 86400000);
+    if (days <= 0) return 'latest';
+    if (days < 14) return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+    if (days < 60) return Math.round(days / 7) + ' weeks ago';
+    if (days < 730) return Math.round(days / 30) + ' months ago';
+    return Math.round(days / 365) + ' years ago';
+  }
+
+  function render(i) {
+    const p = photos[i];
+    heroImg.src = p.src;
+    heroDt.textContent = p.date;
+    counter.textContent = (i + 1) + ' of ' + total;
+    elapsed.textContent = fmtElapsed(p.iso);
+    // Track fill (for WebKit thumbnail trick)
+    const pct = total === 1 ? 100 : (i / (total - 1)) * 100;
+    scrub.style.setProperty('--scrub-pct', pct + '%');
+    // Highlight matching journal pic
+    document.querySelectorAll('.journal-entry .pic').forEach(el => el.classList.remove('active'));
+    const match = document.querySelector('.journal-entry[data-photo-id="' + p.id + '"] .pic');
+    if (match) match.classList.add('active');
+  }
+
+  scrub.addEventListener('input', () => render(parseInt(scrub.value, 10)));
+  render(parseInt(scrub.value, 10));
+
+  // Tap a journal entry to seek the scrubber
+  document.querySelectorAll('.journal-entry[data-photo-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.photoId;
+      const idx = photos.findIndex(p => String(p.id) === String(id));
+      if (idx >= 0) { scrub.value = idx; render(idx); }
+    });
+  });
+})();
+</script>
+{% endif %}
+
 {% endblock %}

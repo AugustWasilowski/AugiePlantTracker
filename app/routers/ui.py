@@ -94,6 +94,7 @@ def create_plant(
     acquired_on: Optional[str] = Form(None),
     care_notes: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    photo_id: Optional[int] = Form(None),
     db: Session = Depends(get_session),
 ) -> RedirectResponse:
     kwargs = _form_to_plant_kwargs(
@@ -106,6 +107,13 @@ def create_plant(
     db.add(plant)
     db.commit()
     db.refresh(plant)
+
+    if photo_id is not None:
+        photo = db.get(Photo, photo_id)
+        if photo is not None and photo.plant_id is None:
+            photo.plant_id = plant.id
+            db.commit()
+
     return RedirectResponse(f"/plants/{plant.id}", status_code=303)
 
 

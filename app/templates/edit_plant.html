@@ -13,6 +13,10 @@
 
 <form method="post" action="{{ action }}">
 
+  {% if not plant and request.query_params.get('photo_id') %}
+    <input type="hidden" name="photo_id" value="{{ request.query_params.get('photo_id') }}">
+  {% endif %}
+
   <div class="field-group">
     <div class="group-label">Identity</div>
     <div class="field">
@@ -23,12 +27,12 @@
     <div class="field">
       <label class="label" for="f-species">Species</label>
       <input id="f-species" name="species" placeholder="Monstera deliciosa"
-             value="{{ plant.species or '' if plant else '' }}">
+             value="{{ (plant.species or '') if plant else request.query_params.get('species', '') }}">
     </div>
     <div class="field">
       <label class="label" for="f-common">Common name</label>
       <input id="f-common" name="common_name" placeholder="Swiss cheese plant"
-             value="{{ plant.common_name or '' if plant else '' }}">
+             value="{{ (plant.common_name or '') if plant else request.query_params.get('common_name', '') }}">
     </div>
   </div>
 

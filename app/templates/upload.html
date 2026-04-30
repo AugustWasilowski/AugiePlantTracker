@@ -121,7 +121,12 @@
             </div>
           </button>
         {% endfor %}
-        {% if not photo %}
+        {% if photo %}
+        <a class="match-row dashed" href="/plants/new?photo_id={{ photo.id }}{% if photo.identified_species %}&species={{ photo.identified_species|urlencode }}{% endif %}{% if photo.identified_common_name %}&common_name={{ photo.identified_common_name|urlencode }}{% endif %}">
+          {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
+          Save as a new plant
+        </a>
+        {% else %}
         <button type="button" class="match-row dashed" data-plant-id="">
           {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
           Save as a new plant

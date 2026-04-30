@@ -47,7 +47,7 @@
   {% else %}
   {# ── New upload ── #}
   <label class="upload-photo-card" id="photo-card">
-    <input type="file" name="file" accept="image/*" capture="environment" required id="file-input">
+    <input type="file" name="file" accept="image/*" required id="file-input">
     <div class="placeholder" id="photo-placeholder">
       {% with name='cam', size=32 %}{% include "_icon.html" %}{% endwith %}
       <div>Tap to take a photo</div>

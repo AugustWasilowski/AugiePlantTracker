@@ -45,6 +45,15 @@ def _migrate_sqlite() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE photos ADD COLUMN is_milestone BOOLEAN NOT NULL DEFAULT 0"
             )
+        if "immich_asset_id" not in photo_cols:
+            log.info("Adding photos.immich_asset_id column + index")
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN immich_asset_id VARCHAR(64)"
+            )
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_photos_immich_asset_id "
+                "ON photos (immich_asset_id)"
+            )
 
 
 def init_db() -> None:

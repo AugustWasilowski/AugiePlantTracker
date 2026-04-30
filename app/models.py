@@ -87,6 +87,11 @@ class Photo(Base):
     # page even if no caption is set.
     is_milestone: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Set for photos auto-imported from Immich (via app.sync). The original
+    # asset id is the dedup key — the sync worker skips any asset whose id is
+    # already present here. NULL for manually-uploaded photos.
+    immich_asset_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+
     plant: Mapped[Optional[Plant]] = relationship(back_populates="photos")
 
     @property

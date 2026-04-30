@@ -89,30 +89,50 @@
   Photos you uploaded without picking a plant. Tap one to assign it.
 </p>
 {% for photo in unassigned %}
-  <a class="plant-row" href="/upload?photo_id={{ photo.id }}">
-    <div class="thumb">
-      {% if photo.thumb_filename %}
-        <img src="/media/{{ photo.thumb_filename }}" alt="">
-      {% endif %}
-    </div>
-    <div class="info">
-      <div class="name">
-        {% if photo.identified_species %}
-          <em>{{ photo.confidence_lead or 'Possibly' }} {{ photo.identified_species }}</em>
-        {% else %}
-          <span class="muted">No guess yet</span>
+  <div style="display:flex; align-items:stretch;">
+    <a class="plant-row" href="/upload?photo_id={{ photo.id }}" style="flex:1; min-width:0;">
+      <div class="thumb">
+        {% if photo.thumb_filename %}
+          <img src="/media/{{ photo.thumb_filename }}" alt="">
         {% endif %}
       </div>
-      <div class="species">{{ photo.captured_at.strftime('%Y-%m-%d') }}</div>
-    </div>
-    {% if photo.identified_confidence %}
-      {% set c = photo.identified_confidence %}
-      <span class="conf {% if c >= 0.85 %}conf-likely{% elif c >= 0.55 %}conf-maybe{% elif c > 0 %}conf-unsure{% else %}conf-none{% endif %}">
-        {{ photo.confidence_word or 'Unsure' }}
-      </span>
-    {% endif %}
-  </a>
+      <div class="info">
+        <div class="name">
+          {% if photo.identified_species %}
+            <em>{{ photo.confidence_lead or 'Possibly' }} {{ photo.identified_species }}</em>
+          {% else %}
+            <span class="muted">No guess yet</span>
+          {% endif %}
+        </div>
+        <div class="species">{{ photo.captured_at.strftime('%Y-%m-%d') }}</div>
+      </div>
+      {% if photo.identified_confidence %}
+        {% set c = photo.identified_confidence %}
+        <span class="conf {% if c >= 0.85 %}conf-likely{% elif c >= 0.55 %}conf-maybe{% elif c > 0 %}conf-unsure{% else %}conf-none{% endif %}">
+          {{ photo.confidence_word or 'Unsure' }}
+        </span>
+      {% endif %}
+    </a>
+    <button type="button" class="delete-photo-btn" data-id="{{ photo.id }}"
+            title="Delete photo"
+            style="border:none; background:transparent; color:#888; cursor:pointer; padding:0 16px; font-size:22px; line-height:1; flex-shrink:0;">&times;</button>
+  </div>
 {% endfor %}
+
+<script>
+document.querySelectorAll('.delete-photo-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (!confirm('Delete this photo permanently?')) return;
+    try {
+      const resp = await fetch('/api/photos/' + btn.dataset.id, { method: 'DELETE' });
+      if (!resp.ok) throw new Error('failed');
+      btn.closest('div').remove();
+    } catch {
+      alert('Could not delete photo.');
+    }
+  });
+});
+</script>
 {% endif %}
 
 {% endblock %}

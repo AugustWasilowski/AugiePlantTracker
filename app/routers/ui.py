@@ -169,9 +169,10 @@ def delete_plant(plant_id: int, db: Session = Depends(get_session)) -> RedirectR
 
 
 @router.get("/upload", response_class=HTMLResponse)
-def upload_form(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
+def upload_form(request: Request, photo_id: Optional[int] = None, db: Session = Depends(get_session)) -> HTMLResponse:
     plants = db.query(Plant).order_by(Plant.nickname).all()
+    photo = db.get(Photo, photo_id) if photo_id else None
     return templates.TemplateResponse(
         "upload.html",
-        _ctx(request, db, plants=plants),
+        _ctx(request, db, plants=plants, photo=photo),
     )

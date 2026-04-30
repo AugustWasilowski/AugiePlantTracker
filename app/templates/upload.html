@@ -1,16 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Upload photo – Plant Tracker{% endblock %}
+{% block title %}{% if photo %}Assign photo{% else %}Upload photo{% endif %} – Plant Tracker{% endblock %}
 {% block content %}
 
 <div class="page-head">
   <a href="/" class="muted small" style="display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;">
     {% with name='back', size=14 %}{% include "_icon.html" %}{% endwith %} All plants
   </a>
-  <h1>Add a photo</h1>
+  <h1>{% if photo %}Assign this photo{% else %}Add a photo{% endif %}</h1>
+  {% if not photo %}
   <div class="subtitle">We'll guess what it is. You can correct us.</div>
+  {% endif %}
 </div>
 
-<form id="upload-form" enctype="multipart/form-data">
+<form id="upload-form" {% if not photo %}enctype="multipart/form-data"{% endif %}>
+
+  {% if photo %}
+  {# ── Existing inbox photo – show full size ── #}
+  <div class="upload-photo-card" style="overflow:hidden; cursor:default;">
+    <img src="/media/{{ photo.filename }}" alt=""
+         style="width:100%; height:100%; object-fit:contain; display:block;">
+  </div>
+
+  {% if photo.identified_species or photo.identified_common_name %}
+  <div class="section-head" style="margin-top: 18px;">
+    <div class="section-label">Looks like…</div>
+  </div>
+  <div style="padding: 0 20px;">
+    <div style="padding: 14px; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+        <div>
+          <div class="muted small">{{ photo.confidence_lead or 'Possibly' }}…</div>
+          <div style="font-size: 18px; font-weight: 600; font-style: italic; margin-top: 2px;">{{ photo.identified_species or '' }}</div>
+          <div class="muted small" style="margin-top: 2px;">{{ photo.identified_common_name or '' }}</div>
+        </div>
+        {% if photo.identified_confidence %}
+          {% set c = photo.identified_confidence %}
+          <span class="conf {% if c >= 0.85 %}conf-likely{% elif c >= 0.55 %}conf-maybe{% elif c > 0 %}conf-unsure{% else %}conf-none{% endif %}">
+            {{ photo.confidence_word }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  {# ── New upload ── #}
   <label class="upload-photo-card" id="photo-card">
     <input type="file" name="file" accept="image/*" capture="environment" required id="file-input">
     <div class="placeholder" id="photo-placeholder">
@@ -21,7 +56,7 @@
     <img id="photo-preview" alt="" style="display:none;">
   </label>
 
-  {# ─── Identification (populated after upload) ─── #}
+  {# Identification (populated after upload) #}
   <div id="id-result" style="display:none;">
     <div class="section-head" style="margin-top: 18px;">
       <div class="section-label">Looks like…</div>
@@ -47,14 +82,15 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  {# ─── Match to existing plant ─── #}
+  {# ── Match to existing plant ── #}
   <div class="section-head" style="margin-top: 18px;">
     <div class="section-label">Add to which plant?</div>
   </div>
   <div style="padding: 0 20px;">
-    {% if request.query_params.get('plant_id') %}
-      {# Pre-selected — render hidden input #}
+    {% if not photo and request.query_params.get('plant_id') %}
+      {# Pre-selected (from plant detail page) — render hidden input #}
       <input type="hidden" name="plant_id" value="{{ request.query_params.get('plant_id') }}">
       {% for p in plants if p.id|string == request.query_params.get('plant_id') %}
         <div class="match-row primary">
@@ -85,39 +121,53 @@
             </div>
           </button>
         {% endfor %}
+        {% if not photo %}
         <button type="button" class="match-row dashed" data-plant-id="">
           {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
           Save as a new plant
         </button>
+        {% endif %}
       </div>
       <input type="hidden" name="plant_id" id="plant-id-input" value="">
     {% endif %}
   </div>
 
-  {# ─── Quick measurements ─── #}
+  {# ── Quick measurements ── #}
   <div class="field-group">
     <div class="group-label">Quick measurements <span class="muted" style="font-weight:400; text-transform:none; letter-spacing:0;">· optional</span></div>
     <div class="field-row">
       <div class="field">
         <label class="label" for="m-h">Height (cm)</label>
-        <input id="m-h" name="height_cm" type="number" step="0.5" inputmode="decimal" placeholder="—">
+        <input id="m-h" name="height_cm" type="number" step="0.5" inputmode="decimal" placeholder="—"
+               {% if photo and photo.measured_height_cm %}value="{{ photo.measured_height_cm }}"{% endif %}>
         <div class="hint" id="hint-h" style="display:none;">Last: <span class="accent" id="hint-h-val"></span></div>
       </div>
       <div class="field">
         <label class="label" for="m-l">Leaves</label>
-        <input id="m-l" name="leaf_count" type="number" inputmode="numeric" placeholder="—">
+        <input id="m-l" name="leaf_count" type="number" inputmode="numeric" placeholder="—"
+               {% if photo and photo.measured_leaf_count %}value="{{ photo.measured_leaf_count }}"{% endif %}>
         <div class="hint" id="hint-l" style="display:none;">Last: <span class="accent" id="hint-l-val"></span></div>
       </div>
     </div>
     <div class="field">
       <label class="label" for="m-cap">Caption (optional)</label>
-      <input id="m-cap" name="caption" placeholder="Repotted into 8&quot; terracotta">
+      <input id="m-cap" name="caption" placeholder="Repotted into 8&quot; terracotta"
+             {% if photo and photo.caption %}value="{{ photo.caption }}"{% endif %}>
       <div class="hint">Captions show up in the journal.</div>
     </div>
   </div>
 
   <div class="form-footer">
-    <button type="submit" class="btn" id="save-btn">Save photo</button>
+    <button type="submit" class="btn" id="save-btn">
+      {% if photo %}Assign to plant{% else %}Save photo{% endif %}
+    </button>
+    {% if photo %}
+    <button type="button" class="btn-secondary" id="delete-btn"
+            style="color: #c0392b;">
+      {% with name='trash', size=14 %}{% include "_icon.html" %}{% endwith %}
+      Delete
+    </button>
+    {% endif %}
     <a class="btn-secondary" href="/">Cancel</a>
   </div>
 </form>
@@ -142,17 +192,18 @@
 <script>
 (function () {
   const form = document.getElementById('upload-form');
-  const fileInput = document.getElementById('file-input');
-  const placeholder = document.getElementById('photo-placeholder');
-  const preview = document.getElementById('photo-preview');
   const status = document.getElementById('status');
   const result = document.getElementById('result');
-  const idResult = document.getElementById('id-result');
   const matchList = document.getElementById('match-list');
   const plantInput = document.getElementById('plant-id-input');
   const plants = JSON.parse(document.getElementById('plants-data').textContent);
 
-  // Local preview
+  {% if not photo %}
+  const fileInput = document.getElementById('file-input');
+  const placeholder = document.getElementById('photo-placeholder');
+  const preview = document.getElementById('photo-preview');
+  const idResult = document.getElementById('id-result');
+
   fileInput.addEventListener('change', () => {
     const f = fileInput.files[0];
     if (!f) return;
@@ -160,8 +211,8 @@
     preview.src = url; preview.style.display = 'block';
     placeholder.style.display = 'none';
   });
+  {% endif %}
 
-  // Match-list selection
   if (matchList) {
     matchList.addEventListener('click', (e) => {
       const btn = e.target.closest('.match-row');
@@ -169,7 +220,7 @@
       matchList.querySelectorAll('.match-row').forEach(r => r.classList.remove('primary'));
       btn.classList.add('primary');
       plantInput.value = btn.dataset.plantId || '';
-      // Show prefilled measurements if we have last values
+      {% if not photo %}
       const p = plants.find(p => String(p.id) === String(btn.dataset.plantId));
       const hH = document.getElementById('hint-h'), hL = document.getElementById('hint-l');
       if (p && p.last_h) {
@@ -180,9 +231,11 @@
         document.getElementById('hint-l-val').textContent = p.last_l + ' leaves';
         hL.style.display = 'block';
       } else { hL.style.display = 'none'; }
+      {% endif %}
     });
   }
 
+  {% if not photo %}
   function setConf(c) {
     const chip = document.getElementById('id-conf');
     chip.classList.remove('conf-likely','conf-maybe','conf-unsure','conf-none');
@@ -193,12 +246,39 @@
     if (c >= 0.55) { chip.classList.add('conf-maybe');  chip.textContent = 'Maybe';  return 'Could be'; }
     chip.classList.add('conf-unsure'); chip.textContent = 'Unsure'; return 'Possibly';
   }
+  {% endif %}
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const pid = plantInput ? plantInput.value : (form.querySelector('[name=plant_id]') || {}).value;
+
+    {% if photo %}
+    if (!pid) { status.textContent = 'Pick a plant first.'; return; }
+    status.textContent = 'Saving…';
+    try {
+      const assignData = new FormData();
+      assignData.append('plant_id', pid);
+      const resp = await fetch('/api/photos/{{ photo.id }}/assign', { method: 'POST', body: assignData });
+      if (!resp.ok) throw new Error('assign failed: ' + resp.status);
+
+      const cap = document.getElementById('m-cap').value;
+      const h = document.getElementById('m-h').value;
+      const l = document.getElementById('m-l').value;
+      if (cap || h || l) {
+        const mData = new FormData();
+        if (cap) mData.append('caption', cap);
+        if (h) mData.append('height_cm', h);
+        if (l) mData.append('leaf_count', l);
+        await fetch('/api/photos/{{ photo.id }}/measurements', { method: 'POST', body: mData });
+      }
+      status.textContent = '';
+      location.href = '/plants/' + pid;
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+    }
+    {% else %}
     const data = new FormData();
     data.append('file', fileInput.files[0]);
-    const pid = (form.querySelector('[name=plant_id]') || {}).value || plantInput.value;
     if (pid) data.append('plant_id', pid);
     const cap = document.getElementById('m-cap').value;
     const h = document.getElementById('m-h').value;
@@ -214,7 +294,6 @@
       const json = await resp.json();
       status.textContent = '';
 
-      // Show inline ID result
       const id = json.identified || {};
       if (id.species || id.common_name) {
         const lead = setConf(id.confidence ?? null);
@@ -229,7 +308,6 @@
       }
 
       if (json.plant_id) {
-        // Hop to the plant
         location.href = '/plants/' + json.plant_id;
       } else {
         result.innerHTML = '<p class="muted">Saved as unassigned. <a href="/">Back to home</a> to attach it, or <a href="/plants/new">create a new plant</a>.</p>';
@@ -237,16 +315,31 @@
     } catch (err) {
       status.textContent = 'Error: ' + err.message;
     }
+    {% endif %}
   });
 
-  // Confirm/reject ID — UX only for now; backend already saved.
+  {% if not photo %}
   document.getElementById('id-confirm')?.addEventListener('click', () => {
     document.getElementById('id-card').style.opacity = '0.6';
     document.getElementById('id-confirm').textContent = 'Confirmed ✓';
   });
   document.getElementById('id-reject')?.addEventListener('click', () => {
-    idResult.style.display = 'none';
+    document.getElementById('id-result').style.display = 'none';
   });
+  {% endif %}
+
+  {% if photo %}
+  document.getElementById('delete-btn').addEventListener('click', async () => {
+    if (!confirm('Delete this photo permanently?')) return;
+    try {
+      const resp = await fetch('/api/photos/{{ photo.id }}', { method: 'DELETE' });
+      if (!resp.ok) throw new Error('delete failed: ' + resp.status);
+      location.href = '/';
+    } catch (err) {
+      status.textContent = 'Error: ' + err.message;
+    }
+  });
+  {% endif %}
 })();
 </script>
 

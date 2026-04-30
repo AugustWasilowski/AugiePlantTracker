@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
-import mimetypes
 from pathlib import Path
 from typing import Any
 
 import httpx
 
+from . import imaging
 from .config import settings
 
 log = logging.getLogger(__name__)
@@ -53,19 +53,20 @@ async def identify(image_path: Path) -> IdentifyResult | None:
     if settings.n8n_webhook_token:
         headers["X-Plant-Tracker-Token"] = settings.n8n_webhook_token
 
-    mime, _ = mimetypes.guess_type(image_path.name)
-    if not mime or not mime.startswith("image/"):
-        mime = "image/jpeg"
+    try:
+        payload = imaging.make_identify_payload(image_path)
+    except Exception as e:
+        log.warning("Could not encode %s for identify: %s", image_path, e)
+        return None
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            with image_path.open("rb") as fh:
-                files = {"image": (image_path.name, fh, mime)}
-                resp = await client.post(
-                    settings.n8n_identify_webhook_url,
-                    files=files,
-                    headers=headers,
-                )
+            files = {"image": ("plant.jpg", payload, "image/jpeg")}
+            resp = await client.post(
+                settings.n8n_identify_webhook_url,
+                files=files,
+                headers=headers,
+            )
         resp.raise_for_status()
     except httpx.HTTPError as e:
         log.warning("n8n identify call failed: %s", e)

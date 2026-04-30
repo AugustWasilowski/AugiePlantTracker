@@ -1,6 +1,7 @@
 """Image utilities: EXIF timestamp extraction, thumbnail generation."""
 from __future__ import annotations
 
+import io
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
@@ -65,6 +66,24 @@ def extract_captured_at(image_path: Path) -> Optional[datetime]:
                 return dt
 
     return None
+
+
+def make_identify_payload(src: Path, max_side: int = 1568, quality: int = 85) -> bytes:
+    """Return JPEG bytes downsized for the Claude Vision identify webhook.
+
+    Anthropic's vision models cap inbound base64 images at 5 MB and downscale
+    anything over 1568px on the long side anyway, so this is both smaller and
+    lossless to the model.
+    """
+    with Image.open(src) as im:
+        im = ImageOps.exif_transpose(im)
+        if max(im.size) > max_side:
+            im.thumbnail((max_side, max_side))
+        if im.mode not in ("RGB", "L"):
+            im = im.convert("RGB")
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=quality, optimize=True)
+        return buf.getvalue()
 
 
 def make_thumbnail(src: Path, dest: Path, max_side: int = 600) -> Tuple[int, int]:

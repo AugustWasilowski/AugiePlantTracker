@@ -6,6 +6,7 @@ need: CLIP smart search, asset enrichment, and image download.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -46,6 +47,19 @@ class ImmichClient:
         )
         resp.raise_for_status()
         return resp.json().get("assets", {}).get("items", [])
+
+    async def has_assets_after(self, after: datetime) -> bool:
+        """Cheap delta check: True if any asset was uploaded to Immich after `after`.
+        Uses metadata search (indexed on createdAt) with size=1 — no CLIP work."""
+        if after.tzinfo is None:
+            after = after.replace(tzinfo=timezone.utc)
+        resp = await self._client.post(
+            "/api/search/metadata",
+            json={"createdAfter": after.isoformat(), "size": 1},
+            headers={"Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        return bool(resp.json().get("assets", {}).get("items", []))
 
     # ---- assets ----
 

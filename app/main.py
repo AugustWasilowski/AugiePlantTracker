@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 
 from .config import settings
 from .database import init_db
-from .routers import plants, photos, ui
+from .routers import plants, photos, sync, ui
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -75,6 +75,7 @@ ui.templates = templates  # share the instance
 app.include_router(ui.router)
 app.include_router(plants.router, prefix="/api/plants", tags=["plants"])
 app.include_router(photos.router, prefix="/api/photos", tags=["photos"])
+app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 
 
 @app.get("/media/{rel_path:path}")

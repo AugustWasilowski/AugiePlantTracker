@@ -11,6 +11,7 @@ Pipeline:
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -28,6 +29,9 @@ from .immich import ImmichClient
 from .models import Photo
 
 log = logging.getLogger(__name__)
+
+_last_scan_at: Optional[datetime] = None
+_sync_lock = asyncio.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -85,13 +89,53 @@ def _known_immich_ids() -> set[str]:
 # ---------------------------------------------------------------------------
 
 
-async def run_sync() -> dict:
-    """One full sync pass against Immich. Returns a stats dict."""
+async def run_sync(force: bool = False) -> dict:
+    """One sync pass against Immich. Returns a stats dict.
+
+    Cheap-path: if `force` is False and we've scanned at least once, ask
+    Immich whether *any* asset has been uploaded since our last scan. If
+    none, skip the expensive CLIP fan-out entirely.
+    """
+    global _last_scan_at
+
     if not settings.immich_url:
         raise RuntimeError("IMMICH_URL not configured.")
     if not settings.immich_api_key:
         raise RuntimeError("IMMICH_API_KEY not configured.")
 
+    async with _sync_lock:
+        scan_started_at = datetime.now(timezone.utc)
+
+        if not force and _last_scan_at is not None:
+            try:
+                async with ImmichClient(settings.immich_url, settings.immich_api_key) as probe:
+                    if not await probe.has_assets_after(_last_scan_at):
+                        log.info(
+                            "immich delta: nothing new since %s — skipping full sync",
+                            _last_scan_at.isoformat(),
+                        )
+                        _last_scan_at = scan_started_at
+                        return {
+                            "queries": 0,
+                            "raw_results": 0,
+                            "unique_candidates": 0,
+                            "already_known": 0,
+                            "no_gps": 0,
+                            "out_of_radius": 0,
+                            "errors": 0,
+                            "inserted": 0,
+                            "skipped": "no_new_assets",
+                        }
+            except Exception as e:
+                log.warning("immich delta check failed (%s) — running full sync", e)
+
+        stats = await _run_full_sync()
+        _last_scan_at = scan_started_at
+        return stats
+
+
+async def _run_full_sync() -> dict:
+    """The original CLIP fan-out + geofence + import pass."""
     seen: dict[str, str] = {}  # asset_id -> first matching CLIP query
     raw_count = 0
     inserted = 0

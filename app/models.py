@@ -92,6 +92,11 @@ class Photo(Base):
     # already present here. NULL for manually-uploaded photos.
     immich_asset_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
 
+    # Geofence the photo's GPS landed inside at import time, e.g. "Home" or
+    # "Mom and Dad's House". Used to prefill the Location field when spawning
+    # a new plant from an inbox photo. NULL for manual uploads.
+    imported_location: Mapped[Optional[str]] = mapped_column(String(120))
+
     plant: Mapped[Optional[Plant]] = relationship(back_populates="photos")
 
     @property

@@ -54,6 +54,11 @@ def _migrate_sqlite() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_photos_immich_asset_id "
                 "ON photos (immich_asset_id)"
             )
+        if "imported_location" not in photo_cols:
+            log.info("Adding photos.imported_location column")
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN imported_location VARCHAR(120)"
+            )
 
 
 def init_db() -> None:

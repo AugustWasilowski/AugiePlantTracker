@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated, Any, List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -35,6 +35,12 @@ class Settings(BaseSettings):
         "leafy green plant in a pot",
     ]
     clip_results_per_query: int = 50
+    # Optional extra named geofences as a JSON array, e.g.
+    # GEOFENCES='[{"name":"Mom and Dad","lat":42.04,"lon":-88.30,"radius_km":0.5}]'
+    # Anything inside any geofence is imported and tagged with that location.
+    # The single HOME_* set above is treated as the implicit "Home" geofence.
+    geofences: List[dict] = []
+    home_name: str = "Home"
 
     @field_validator("clip_queries", mode="before")
     @classmethod
@@ -58,6 +64,32 @@ class Settings(BaseSettings):
     @property
     def immich_enabled(self) -> bool:
         return bool(self.immich_url and self.immich_api_key)
+
+    @property
+    def all_geofences(self) -> List[dict]:
+        """Combined list of geofences: implicit Home (from HOME_*) + GEOFENCES extras.
+
+        Each entry is a dict with keys: name, lat, lon, radius_km.
+        Returns [] if no geofence is configured at all (both HOME_* and GEOFENCES empty)."""
+        out: List[dict] = []
+        if self.home_lat or self.home_lon:
+            out.append({
+                "name": self.home_name,
+                "lat": float(self.home_lat),
+                "lon": float(self.home_lon),
+                "radius_km": float(self.home_radius_km),
+            })
+        for g in self.geofences:
+            try:
+                out.append({
+                    "name": str(g["name"]),
+                    "lat": float(g["lat"]),
+                    "lon": float(g["lon"]),
+                    "radius_km": float(g.get("radius_km", 0.5)),
+                })
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
 
 
 settings = Settings()

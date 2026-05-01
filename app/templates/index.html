@@ -129,7 +129,9 @@
             <span class="muted">No guess yet</span>
           {% endif %}
         </div>
-        <div class="species">{{ photo.captured_at.strftime('%Y-%m-%d') }}</div>
+        <div class="species">
+          {{ photo.captured_at.strftime('%Y-%m-%d') }}{% if photo.imported_location %} · {{ photo.imported_location }}{% endif %}
+        </div>
       </div>
       {% if photo.identified_confidence %}
         {% set c = photo.identified_confidence %}

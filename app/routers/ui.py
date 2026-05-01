@@ -76,10 +76,15 @@ def index(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
 
 
 @router.get("/plants/new", response_class=HTMLResponse)
-def new_plant_form(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
+def new_plant_form(
+    request: Request,
+    photo_id: Optional[int] = None,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    photo = db.get(Photo, photo_id) if photo_id else None
     return templates.TemplateResponse(
         "edit_plant.html",
-        _ctx(request, db, plant=None, action="/plants/new"),
+        _ctx(request, db, plant=None, action="/plants/new", photo=photo),
     )
 
 

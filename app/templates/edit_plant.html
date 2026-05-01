@@ -41,7 +41,7 @@
     <div class="field">
       <label class="label" for="f-loc">Location</label>
       <input id="f-loc" name="location" placeholder="Living room window"
-             value="{{ plant.location or '' if plant else '' }}">
+             value="{{ plant.location or '' if plant else (photo.imported_location if photo else '') }}">
     </div>
     <div class="field-row">
       <div class="field">

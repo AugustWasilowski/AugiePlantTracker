@@ -199,8 +199,12 @@ async def _run_full_sync() -> dict:
             if lat is None or lon is None:
                 skipped_no_gps += 1
                 continue
-            dist = haversine_km(settings.home_lat, settings.home_lon, lat, lon)
-            if dist > settings.home_radius_km:
+            matched_location: Optional[str] = None
+            for fence in settings.all_geofences:
+                if haversine_km(fence["lat"], fence["lon"], lat, lon) <= fence["radius_km"]:
+                    matched_location = fence["name"]
+                    break
+            if matched_location is None:
                 skipped_geofence += 1
                 continue
 
@@ -261,6 +265,7 @@ async def _run_full_sync() -> dict:
                 measured_height_cm=growth.get("height_cm"),
                 measured_leaf_count=growth.get("leaf_count"),
                 immich_asset_id=aid,
+                imported_location=matched_location,
             )
             with session_scope() as sess:
                 sess.add(photo)

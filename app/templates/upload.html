@@ -96,7 +96,7 @@
   <div class="section-head" style="margin-top: 18px;">
     <div class="section-label">Add to which plant?</div>
   </div>
-  <div style="padding: 0 20px;">
+  <div class="upload-matches" style="padding: 0 20px;">
     {% if not photo and request.query_params.get('plant_id') %}
       {# Pre-selected (from plant detail page) — render hidden input #}
       <input type="hidden" name="plant_id" value="{{ request.query_params.get('plant_id') }}">

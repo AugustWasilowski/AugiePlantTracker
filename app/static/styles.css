@@ -391,6 +391,13 @@ button { font: inherit; }
   background: var(--surface-2); flex-shrink: 0;
 }
 .match-row .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Upload-page match list: bigger thumbnails so it's easier to recognize the
+   right plant at a glance. Scoped to .upload-matches so the move-image
+   modal on the edit page keeps its compact size. */
+.upload-matches .match-row .thumb {
+  width: 180px; height: 180px; border-radius: 18px;
+}
 .match-row .info { flex: 1; min-width: 0; }
 .match-row .name { font-size: 14px; font-weight: 600; }
 .match-row .where { font-size: 11px; color: var(--muted); font-style: italic; }
@@ -406,6 +413,72 @@ button { font: inherit; }
 
 /* ─── Sparkline ───────────────────────────────────────────── */
 .sparkline { color: var(--accent); opacity: 0.75; }
+
+/* ─── Gallery ─────────────────────────────────────────────── */
+.gallery-toolbar {
+  display: flex; gap: 8px; padding: 0 20px 8px; flex-wrap: wrap;
+}
+.pill.primary {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px;
+  padding: 0 20px 16px;
+}
+.gallery-tile {
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.gallery-tile img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.gallery-tile:hover { text-decoration: none; }
+
+/* ─── Edit-page cover thumb + move-image modal ───────────── */
+.cover-card {
+  display: flex; gap: 14px; align-items: center;
+  margin: 0 20px 8px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.cover-thumb {
+  width: 84px; height: 84px; border-radius: var(--radius); overflow: hidden;
+  background: var(--surface-2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.cover-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.cover-empty { color: var(--faint); }
+.cover-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cover-date { font-size: 12px; color: var(--muted); }
+
+.move-modal {
+  width: min(92vw, 520px); max-height: 80vh;
+  padding: 0; border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg); color: var(--text);
+  overflow: hidden;
+}
+.move-modal::backdrop { background: rgba(0,0,0,0.45); }
+.move-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.move-modal-head .btn-ghost {
+  font-size: 22px; line-height: 1; padding: 0 8px;
+  border: none; background: transparent; color: var(--muted); cursor: pointer;
+}
+.move-modal-list {
+  padding: 12px; overflow-y: auto; max-height: calc(80vh - 70px);
+}
+.move-modal-list form { margin: 0; }
+.move-modal-list .match-row { width: 100%; }
+.move-modal-list .check { color: var(--accent); margin-left: auto; font-style: italic; }
 
 /* ─── Mobile-first stays mobile-first ─────────────────────── */
 @media (min-width: 720px) {

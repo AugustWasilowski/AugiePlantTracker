@@ -12,9 +12,12 @@
   <header class="topbar">
     <a href="/" class="brand">
       {% with name='sprout', size=22 %}{% include "_icon.html" %}{% endwith %}
-      <span>Plant Tracker</span>
+      <span>Augie's Plant Tracker</span>
     </a>
     <nav>
+      <a href="/gallery" class="iconbtn" aria-label="Gallery">
+        {% with name='grid', size=20 %}{% include "_icon.html" %}{% endwith %}
+      </a>
       {% if unassigned_count is defined and unassigned_count %}
         <a href="/#inbox" class="iconbtn" aria-label="Inbox">
           {% with name='inbox', size=20 %}{% include "_icon.html" %}{% endwith %}

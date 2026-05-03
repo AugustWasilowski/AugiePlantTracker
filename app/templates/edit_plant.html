@@ -11,6 +11,100 @@
   <h1>{{ "Edit plant" if plant else "New plant" }}</h1>
 </div>
 
+{% if plant %}
+  {% set cover = plant.latest_photo %}
+  <div class="cover-card">
+    <div class="cover-thumb">
+      {% if cover and (cover.thumb_filename or cover.filename) %}
+        <img src="/media/{{ cover.thumb_filename or cover.filename }}" alt="">
+      {% else %}
+        <span class="cover-empty">{% with name='pot', size=28 %}{% include "_icon.html" %}{% endwith %}</span>
+      {% endif %}
+    </div>
+    <div class="cover-meta">
+      <div class="cover-date">
+        {% if cover %}
+          Latest photo · {{ cover.captured_at.strftime('%b %d, %Y') }}
+        {% else %}
+          No photos yet
+        {% endif %}
+      </div>
+      {% if cover %}
+      <button type="button" class="btn-secondary" id="open-move-modal">
+        {% with name='leaf', size=14 %}{% include "_icon.html" %}{% endwith %}
+        Move image
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if cover %}
+  <dialog id="move-modal" class="move-modal">
+    <div class="move-modal-head">
+      <div>
+        <div class="group-label" style="margin:0;">Move latest photo to…</div>
+        <div class="muted small" style="margin-top:2px;">
+          Currently on <strong>{{ plant.display_name }}</strong>{% if plant.species %} · <em>{{ plant.species }}</em>{% endif %}
+        </div>
+      </div>
+      <button type="button" class="btn-ghost" id="close-move-modal" aria-label="Close">&times;</button>
+    </div>
+    <div class="move-modal-list">
+      {% if other_plants %}
+        {% set self_key = ((plant.species or plant.common_name or '')|trim|lower) %}
+        {% for p in other_plants %}
+          {% set p_key = ((p.species or p.common_name or '')|trim|lower) %}
+          {% set match = self_key and p_key == self_key %}
+          <form method="post" action="/photos/{{ cover.id }}/move">
+            <input type="hidden" name="target_plant_id" value="{{ p.id }}">
+            <button type="submit" class="match-row{% if match %} primary{% endif %}">
+              <div class="thumb">
+                {% if p.latest_photo and p.latest_photo.thumb_filename %}
+                  <img src="/media/{{ p.latest_photo.thumb_filename }}" alt="">
+                {% else %}
+                  <span style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--faint);">
+                    {% with name='pot', size=18 %}{% include "_icon.html" %}{% endwith %}
+                  </span>
+                {% endif %}
+              </div>
+              <div class="info">
+                <div class="name">{{ p.display_name }}</div>
+                {% if p.species or p.common_name %}
+                  <div class="where">
+                    {% if p.species %}<em>{{ p.species }}</em>{% endif %}
+                    {% if p.species and p.common_name %} · {% endif %}
+                    {% if p.common_name %}{{ p.common_name }}{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+              {% if match %}<span class="check small">same species</span>{% endif %}
+            </button>
+          </form>
+        {% endfor %}
+      {% else %}
+        <div class="muted small" style="padding: 14px;">
+          No other plants to move to. Create one first.
+        </div>
+      {% endif %}
+    </div>
+  </dialog>
+  <script>
+    (function () {
+      const dlg = document.getElementById('move-modal');
+      const open = document.getElementById('open-move-modal');
+      const close = document.getElementById('close-move-modal');
+      if (!dlg || !open) return;
+      open.addEventListener('click', () => dlg.showModal());
+      close && close.addEventListener('click', () => dlg.close());
+      // Click outside the modal content to close.
+      dlg.addEventListener('click', (e) => {
+        if (e.target === dlg) dlg.close();
+      });
+    })();
+  </script>
+  {% endif %}
+{% endif %}
+
 <form method="post" action="{{ action }}">
 
   {% if not plant and request.query_params.get('photo_id') %}
@@ -21,7 +115,8 @@
     <div class="group-label">Identity</div>
     <div class="field">
       <label class="label" for="f-nickname">Nickname <span class="req">*</span></label>
-      <input id="f-nickname" name="nickname" required value="{{ plant.nickname if plant else '' }}">
+      <input id="f-nickname" name="nickname" required
+             value="{{ plant.nickname if plant else (request.query_params.get('common_name') or '') }}">
       <div class="hint">What you actually call them. Frank, Susan, etc.</div>
     </div>
     <div class="field">
@@ -58,7 +153,7 @@
     <div class="field">
       <label class="label" for="f-acq">Acquired on</label>
       <input id="f-acq" name="acquired_on" type="date"
-             value="{{ plant.acquired_on.strftime('%Y-%m-%d') if plant and plant.acquired_on else '' }}">
+             value="{{ plant.acquired_on.strftime('%Y-%m-%d') if plant and plant.acquired_on else (prefill_acquired_on|default('') or today_iso if not plant else '') }}">
     </div>
   </div>
 
@@ -67,7 +162,7 @@
     <div class="field">
       <label class="label" for="f-care">Care notes</label>
       <textarea id="f-care" name="care_notes" rows="3"
-                placeholder="Bright indirect, water when top inch dries.">{{ plant.care_notes or '' if plant else '' }}</textarea>
+                placeholder="Bright indirect, water when top inch dries.">{{ plant.care_notes or '' if plant else (prefill_care_notes|default('')) }}</textarea>
     </div>
     <div class="field">
       <label class="label" for="f-notes">Free-form notes</label>

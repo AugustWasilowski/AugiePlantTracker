@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Gallery – Augie's Plant Tracker{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <h1>Gallery</h1>
+  <div class="subtitle">
+    {{ total }} plant{{ '' if total == 1 else 's' }}
+  </div>
+</div>
+
+{% if total %}
+<div class="gallery-toolbar">
+  <a class="pill {% if sort == 'newest' %}primary{% endif %}" href="/gallery?sort=newest">Newest</a>
+  <a class="pill {% if sort == 'name' %}primary{% endif %}" href="/gallery?sort=name">By name</a>
+</div>
+
+{% for loc, group in groups.items() %}
+<div class="section-head">
+  <div class="section-label">{{ loc }}</div>
+</div>
+<div class="gallery-grid">
+  {% for p in group %}
+    {% set last = p.latest_photo %}
+    <a class="gallery-tile" href="/plants/{{ p.id }}" aria-label="{{ p.display_name }}">
+      <img src="/media/{{ last.thumb_filename or last.filename }}" alt="" loading="lazy">
+    </a>
+  {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-block">
+  <svg width="100" height="100" viewBox="0 0 200 200" fill="none" stroke="currentColor"
+       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="40" y="60" width="120" height="100" rx="8"/>
+    <circle cx="100" cy="115" r="24"/>
+    <path d="M70 60l8-12h44l8 12"/>
+  </svg>
+  <div class="title">No photos yet.</div>
+  <div class="body">Upload one and it'll show up here.</div>
+  <a class="btn" href="/upload">
+    {% with name='cam', size=14 %}{% include "_icon.html" %}{% endwith %}
+    Add a photo
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

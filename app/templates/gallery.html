@@ -1,48 +1,107 @@
 {% extends "base.html" %}
 {% block title %}Gallery – Augie's Plant Tracker{% endblock %}
+{% block container_class %}gallery-container{% endblock %}
 {% block content %}
 
-<div class="page-head">
-  <h1>Gallery</h1>
-  <div class="subtitle">
-    {{ total }} plant{{ '' if total == 1 else 's' }}
+<div class="gallery-toolbar">
+  <h1 class="gallery-title">
+    Gallery
+    <span class="gallery-count">{{ total }} photo{{ '' if total == 1 else 's' }}</span>
+  </h1>
+
+  <form method="get" action="/gallery" class="gallery-search" role="search">
+    {# Preserve the current grouping when the user submits a new search. #}
+    <input type="hidden" name="group" value="{{ group }}">
+    <svg class="gallery-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>
+    </svg>
+    <input type="search" name="q" value="{{ q or '' }}"
+           placeholder="Search by plant, species, location…"
+           autocomplete="off">
+    {% if q %}
+      <a href="/gallery?group={{ group }}" class="gallery-search-clear" aria-label="Clear search">×</a>
+    {% endif %}
+  </form>
+
+  <div class="gallery-segmented" role="tablist" aria-label="Group photos by">
+    {% for opt in [('flat', 'Newest first'), ('plant', 'By plant'), ('location', 'By location')] %}
+      <a href="/gallery?group={{ opt[0] }}{% if q %}&q={{ q }}{% endif %}"
+         class="gallery-seg {% if group == opt[0] %}active{% endif %}"
+         role="tab" aria-selected="{{ 'true' if group == opt[0] else 'false' }}">
+        {{ opt[1] }}
+      </a>
+    {% endfor %}
   </div>
 </div>
 
-{% if total %}
-<div class="gallery-toolbar">
-  <a class="pill {% if sort == 'newest' %}primary{% endif %}" href="/gallery?sort=newest">Newest</a>
-  <a class="pill {% if sort == 'name' %}primary{% endif %}" href="/gallery?sort=name">By name</a>
-</div>
-
-{% for loc, group in groups.items() %}
-<div class="section-head">
-  <div class="section-label">{{ loc }}</div>
-</div>
-<div class="gallery-grid">
-  {% for p in group %}
-    {% set last = p.latest_photo %}
-    <a class="gallery-tile" href="/plants/{{ p.id }}" aria-label="{{ p.display_name }}">
-      <img src="/media/{{ last.thumb_filename or last.filename }}" alt="" loading="lazy">
-    </a>
-  {% endfor %}
-</div>
-{% endfor %}
+{% if total == 0 %}
+  {% if q %}
+    <div class="empty-block">
+      <div class="title">No photos match "{{ q }}".</div>
+      <div class="body">Try a plant name, species, or location.</div>
+      <a class="pill" href="/gallery?group={{ group }}">Clear search</a>
+    </div>
+  {% else %}
+    <div class="empty-block">
+      <svg width="100" height="100" viewBox="0 0 200 200" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="40" y="60" width="120" height="100" rx="8"/>
+        <circle cx="100" cy="115" r="24"/>
+        <path d="M70 60l8-12h44l8 12"/>
+      </svg>
+      <div class="title">No photos yet.</div>
+      <div class="body">Upload one and it'll show up here.</div>
+      <a class="btn" href="/upload">
+        {% with name='cam', size=14 %}{% include "_icon.html" %}{% endwith %}
+        Add a photo
+      </a>
+    </div>
+  {% endif %}
 {% else %}
-<div class="empty-block">
-  <svg width="100" height="100" viewBox="0 0 200 200" fill="none" stroke="currentColor"
-       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="40" y="60" width="120" height="100" rx="8"/>
-    <circle cx="100" cy="115" r="24"/>
-    <path d="M70 60l8-12h44l8 12"/>
-  </svg>
-  <div class="title">No photos yet.</div>
-  <div class="body">Upload one and it'll show up here.</div>
-  <a class="btn" href="/upload">
-    {% with name='cam', size=14 %}{% include "_icon.html" %}{% endwith %}
-    Add a photo
-  </a>
-</div>
+
+{% for grp in groups %}
+  {% if grp.label %}
+    <div class="gallery-group-head">
+      <div>
+        <span class="section-label">{{ grp.label }}</span>
+        {% if grp.sub %}<span class="gallery-group-sub"><em>{{ grp.sub }}</em></span>{% endif %}
+      </div>
+      <span class="gallery-group-count">
+        {{ grp.photos|length }} photo{{ '' if grp.photos|length == 1 else 's' }}
+      </span>
+    </div>
+  {% endif %}
+
+  {# Photos for this group, serialized for the JS layout engine. #}
+  <div class="justified-grid"
+       data-photos='[{% for p in grp.photos %}
+         {"id": {{ p.id }},
+          "plantId": {{ p.plant_id }},
+          "plantNick": {{ (p.plant.nickname or "")|tojson }},
+          "species": {{ (p.plant.species or "")|tojson }},
+          "common": {{ (p.plant.common_name or "")|tojson }},
+          "location": {{ (p.plant.location or "")|tojson }},
+          "src": "/media/{{ p.thumb_filename or p.filename }}",
+          "w": {{ p.width or 1200 }},
+          "h": {{ p.height or 1600 }},
+          "date": "{{ p.captured_at.strftime('%b %-d') if p.captured_at else '' }}"
+         }{{ "," if not loop.last }}
+       {% endfor %}]'>
+    <noscript>
+      {# Plain CSS-grid fallback when JS is off — looks fine, just not justified. #}
+      <div class="gallery-fallback-grid">
+        {% for p in grp.photos %}
+          <a class="gallery-tile" href="/plants/{{ p.plant_id }}">
+            <img src="/media/{{ p.thumb_filename or p.filename }}" alt="" loading="lazy">
+          </a>
+        {% endfor %}
+      </div>
+    </noscript>
+  </div>
+{% endfor %}
+
 {% endif %}
 
+<script src="/static/justified-grid.js?v={{ asset_version }}" defer></script>
 {% endblock %}

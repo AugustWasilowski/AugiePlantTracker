@@ -152,9 +152,17 @@ def plant_detail(plant_id: int, request: Request, db: Session = Depends(get_sess
     plant = db.get(Plant, plant_id)
     if plant is None:
         raise HTTPException(404, "Plant not found")
+
+    # Prev/next nav: alphabetical by nickname so the order is stable and
+    # matches the within-group ordering on the home page.
+    all_plants = db.query(Plant).order_by(Plant.nickname).all()
+    idx = next((i for i, p in enumerate(all_plants) if p.id == plant_id), None)
+    prev_plant = all_plants[idx - 1] if idx is not None and idx > 0 else None
+    next_plant = all_plants[idx + 1] if idx is not None and idx < len(all_plants) - 1 else None
+
     return templates.TemplateResponse(
         "plant.html",
-        _ctx(request, db, plant=plant),
+        _ctx(request, db, plant=plant, prev_plant=prev_plant, next_plant=next_plant),
     )
 
 
@@ -178,6 +186,24 @@ def edit_plant_form(plant_id: int, request: Request, db: Session = Depends(get_s
         (p.nickname or "").lower(),
     ))
 
+    # Distinct locations across all plants, each with a representative
+    # thumbnail (newest photo from any plant in that location). Drives the
+    # live-search dropdown on the Location field. Includes the current plant
+    # so its own location surfaces if it's the only one with that location.
+    loc_map: dict[str, str] = {}  # location -> thumb url (first / most-recent wins)
+    for p in db.query(Plant).all():
+        name = (p.location or "").strip()
+        if not name or name in loc_map:
+            continue
+        thumb = ""
+        if p.latest_photo and p.latest_photo.thumb_filename:
+            thumb = f"/media/{p.latest_photo.thumb_filename}"
+        loc_map[name] = thumb
+    locations = sorted(
+        ({"name": k, "thumb": v} for k, v in loc_map.items()),
+        key=lambda d: d["name"].lower(),
+    )
+
     return templates.TemplateResponse(
         "edit_plant.html",
         _ctx(
@@ -185,6 +211,7 @@ def edit_plant_form(plant_id: int, request: Request, db: Session = Depends(get_s
             plant=plant,
             action=f"/plants/{plant_id}/edit",
             other_plants=others,
+            locations=locations,
         ),
     )
 
@@ -252,30 +279,88 @@ def delete_plant(plant_id: int, db: Session = Depends(get_session)) -> RedirectR
 @router.get("/gallery", response_class=HTMLResponse)
 def gallery(
     request: Request,
-    sort: str = "newest",
+    q: Optional[str] = None,
+    group: str = "flat",
     db: Session = Depends(get_session),
 ) -> HTMLResponse:
-    """Photo grid grouped by location. Click a tile to open the plant."""
-    plants = db.query(Plant).all()
-    # Only plants with at least one photo — the gallery is photos.
-    plants = [p for p in plants if p.latest_photo]
+    """Photo wall — every photo, newest first, with search + grouping.
 
-    groups: dict[str, list[Plant]] = {}
-    for p in plants:
-        loc = (p.location or "").strip() or "Other"
-        groups.setdefault(loc, []).append(p)
+    Tile click goes to /plants/{plant_id}. Photos with no plant are skipped
+    (those live in the inbox, not the gallery).
+    """
+    if group not in {"flat", "plant", "location"}:
+        group = "flat"
 
-    for loc in groups:
-        if sort == "name":
-            groups[loc].sort(key=lambda p: (p.nickname or "").lower())
+    photos = (
+        db.query(Photo)
+        .filter(Photo.plant_id.is_not(None))
+        .order_by(Photo.captured_at.desc())
+        .all()
+    )
+
+    # Search — case-insensitive across plant nickname / species / common /
+    # location. Done in Python (the dataset is small enough; if it grows,
+    # convert to a real SQL filter).
+    if q:
+        needle = q.strip().lower()
+        if needle:
+            def matches(p: Photo) -> bool:
+                pl = p.plant
+                if pl is None:
+                    return False
+                hay = " ".join([
+                    pl.nickname or "",
+                    pl.species or "",
+                    pl.common_name or "",
+                    pl.location or "",
+                ]).lower()
+                return needle in hay
+            photos = [p for p in photos if matches(p)]
+
+    total = len(photos)
+
+    groups: list[dict] = []
+    if group == "flat":
+        groups = [{"label": None, "sub": None, "photos": photos}]
+    else:
+        bucket: dict[str, list[Photo]] = {}
+        sub_for: dict[str, str] = {}
+        for p in photos:
+            pl = p.plant
+            if group == "plant":
+                key = pl.display_name if pl else "Unknown"
+                if pl and pl.species:
+                    sub_for.setdefault(key, pl.species)
+            else:  # location
+                key = (pl.location or "").strip() if pl else ""
+                key = key or "Other"
+            bucket.setdefault(key, []).append(p)
+
+        if group == "plant":
+            ordered = sorted(
+                bucket.items(),
+                key=lambda kv: kv[1][0].captured_at,
+                reverse=True,
+            )
         else:
-            groups[loc].sort(key=lambda p: p.latest_photo.captured_at, reverse=True)
+            ordered = sorted(bucket.items(), key=lambda kv: kv[0].lower())
 
-    total = sum(len(v) for v in groups.values())
+        for key, plist in ordered:
+            groups.append({
+                "label": key,
+                "sub": sub_for.get(key),
+                "photos": plist,
+            })
 
     return templates.TemplateResponse(
         "gallery.html",
-        _ctx(request, db, groups=groups, sort=sort, total=total),
+        _ctx(
+            request, db,
+            groups=groups,
+            group=group,
+            q=q or "",
+            total=total,
+        ),
     )
 
 

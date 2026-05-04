@@ -12,7 +12,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     n8n_identify_webhook_url: str = ""
+    n8n_lookup_webhook_url: str = ""
+    n8n_chat_webhook_url: str = ""
     n8n_webhook_token: str = ""
+    # Public origin used to build absolute photo URLs sent to n8n (so the
+    # Anthropic API can fetch the image). Falls back to the request's host.
+    public_base_url: str = ""
     data_dir: Path = Path("/data")
     max_upload_mb: int = 25
     disable_identify: bool = False

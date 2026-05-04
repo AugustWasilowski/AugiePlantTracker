@@ -99,6 +99,33 @@ class Photo(Base):
 
     plant: Mapped[Optional[Plant]] = relationship(back_populates="photos")
 
+
+class DeletedImmichAsset(Base):
+    """Tombstone for Immich asset ids the user has explicitly deleted, so the
+    auto-import sync doesn't keep re-importing them. Without this, deleting a
+    photo (which clears Photo.immich_asset_id from the DB) lets the next sync
+    treat the asset as 'new' and pull it back in."""
+
+    __tablename__ = "deleted_immich_assets"
+
+    asset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    deleted_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
+
+
+class ChatMessage(Base):
+    """One message in the per-plant Ask-Question chat. Stored so the chat
+    panel hydrates from history on page load."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plant_id: Mapped[int] = mapped_column(ForeignKey("plants.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" or "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # If the user attached a photo to this message (user role only).
+    photo_id: Mapped[Optional[int]] = mapped_column(ForeignKey("photos.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
+
     @property
     def confidence_word(self) -> str:
         """Plain-English confidence label for the UI."""

@@ -26,7 +26,7 @@ from . import imaging, n8n, storage
 from .config import settings
 from .database import session_scope
 from .immich import ImmichClient
-from .models import Photo
+from .models import DeletedImmichAsset, Photo
 
 log = logging.getLogger(__name__)
 
@@ -76,12 +76,20 @@ def _make_thumb_path(photo_path: Path) -> Path:
 
 
 def _known_immich_ids() -> set[str]:
-    """Asset ids already imported (any Photo with immich_asset_id set)."""
+    """Asset ids the sync should NOT re-import.
+
+    Two sources:
+      1. Live Photo rows that already reference an Immich asset.
+      2. Tombstones for assets the user has explicitly deleted — without
+         these, deleting an inbox photo would let the next sync re-import
+         the same asset since its Photo row is gone.
+    """
     with session_scope() as sess:
-        rows = sess.scalars(
+        live = sess.scalars(
             select(Photo.immich_asset_id).where(Photo.immich_asset_id.is_not(None))
         ).all()
-    return set(rows)
+        tombstoned = sess.scalars(select(DeletedImmichAsset.asset_id)).all()
+    return set(live) | set(tombstoned)
 
 
 # ---------------------------------------------------------------------------

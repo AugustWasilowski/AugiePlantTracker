@@ -115,6 +115,17 @@
         </div>
       {% endfor %}
     {% else %}
+      {% if photo %}
+      <a class="match-row dashed" href="/plants/new?photo_id={{ photo.id }}{% if photo.identified_species %}&species={{ photo.identified_species|urlencode }}{% endif %}{% if photo.identified_common_name %}&common_name={{ photo.identified_common_name|urlencode }}{% endif %}">
+        {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
+        Save as a new plant
+      </a>
+      {% else %}
+      <button type="button" class="match-row dashed" data-plant-id="">
+        {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
+        Save as a new plant
+      </button>
+      {% endif %}
       <div id="match-list">
         {% for p in plants[:4] %}
           <button type="button" class="match-row" data-plant-id="{{ p.id }}">
@@ -129,18 +140,18 @@
             </div>
           </button>
         {% endfor %}
-        {% if photo %}
-        <a class="match-row dashed" href="/plants/new?photo_id={{ photo.id }}{% if photo.identified_species %}&species={{ photo.identified_species|urlencode }}{% endif %}{% if photo.identified_common_name %}&common_name={{ photo.identified_common_name|urlencode }}{% endif %}">
-          {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
-          Save as a new plant
-        </a>
-        {% else %}
-        <button type="button" class="match-row dashed" data-plant-id="">
-          {% with name='plus', size=16 %}{% include "_icon.html" %}{% endwith %}
-          Save as a new plant
-        </button>
-        {% endif %}
       </div>
+      {% if plants|length > 4 %}
+      <div class="plant-search">
+        <svg class="plant-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input type="text" id="plant-search-input"
+               placeholder="Search for another plant…" autocomplete="off">
+      </div>
+      <div class="search-results" id="search-results" hidden></div>
+      {% endif %}
       <input type="hidden" name="plant_id" id="plant-id-input" value="">
     {% endif %}
   </div>
@@ -196,6 +207,8 @@
     'id': p.id,
     'name': p.display_name,
     'species': p.species or '',
+    'common_name': p.common_name or '',
+    'thumb': ('/media/' + last.thumb_filename) if last and last.thumb_filename else '',
     'last_h': last.measured_height_cm if last and last.measured_height_cm else None,
     'last_l': last.measured_leaf_count if last and last.measured_leaf_count else None,
   }) -%}
@@ -235,11 +248,16 @@
   });
   {% endif %}
 
-  if (matchList) {
-    matchList.addEventListener('click', (e) => {
+  // Scope to .upload-matches (parent of both #match-list, the moved "Save
+  // as a new plant" dashed button, and the search-results dropdown) so
+  // clicks on any .match-row in any of those toggle the selection highlight
+  // and update plantInput.
+  const matchScope = document.querySelector('.upload-matches');
+  if (matchList && matchScope) {
+    matchScope.addEventListener('click', (e) => {
       const btn = e.target.closest('.match-row');
       if (!btn) return;
-      matchList.querySelectorAll('.match-row').forEach(r => r.classList.remove('primary'));
+      matchScope.querySelectorAll('.match-row').forEach(r => r.classList.remove('primary'));
       btn.classList.add('primary');
       plantInput.value = btn.dataset.plantId || '';
       {% if not photo %}
@@ -254,6 +272,45 @@
         hL.style.display = 'block';
       } else { hL.style.display = 'none'; }
       {% endif %}
+    });
+  }
+
+  // Live search dropdown for plants beyond the top 4. Renders results as
+  // .match-row buttons inside .upload-matches so the existing click delegate
+  // (above) takes care of selection.
+  const searchInput = document.getElementById('plant-search-input');
+  const searchResults = document.getElementById('search-results');
+  if (searchInput && searchResults) {
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) {
+        searchResults.innerHTML = '';
+        searchResults.hidden = true;
+        return;
+      }
+      const matches = plants.filter(p => {
+        const hay = ((p.name || '') + ' ' + (p.species || '') + ' ' + (p.common_name || '')).toLowerCase();
+        return hay.includes(q);
+      }).slice(0, 8);
+      if (!matches.length) {
+        searchResults.innerHTML = '<div class="muted small" style="padding: 10px 12px;">No matches.</div>';
+        searchResults.hidden = false;
+        return;
+      }
+      searchResults.innerHTML = matches.map(p => {
+        const thumbHtml = p.thumb ? '<img src="' + p.thumb + '" alt="">' : '';
+        const speciesHtml = p.species ? '<div class="where">' + escapeHtml(p.species) + '</div>' : '';
+        return '<button type="button" class="match-row" data-plant-id="' + p.id + '">'
+          + '<div class="thumb">' + thumbHtml + '</div>'
+          + '<div class="info"><div class="name">' + escapeHtml(p.name) + '</div>' + speciesHtml + '</div>'
+          + '</button>';
+      }).join('');
+      searchResults.hidden = false;
     });
   }
 

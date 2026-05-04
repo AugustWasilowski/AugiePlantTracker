@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .. import imaging, n8n, storage
 from ..config import settings
 from ..database import get_session
-from ..models import Photo, Plant
+from ..models import DeletedImmichAsset, Photo, Plant
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -149,6 +149,11 @@ def delete_photo(photo_id: int, db: Session = Depends(get_session)) -> dict:
     photo = db.get(Photo, photo_id)
     if photo is None:
         raise HTTPException(404, "Photo not found")
+    # Tombstone the Immich asset id (if any) so the sync worker doesn't
+    # re-import it on the next pass. Use merge() because the asset might
+    # already be tombstoned from a prior delete-then-recreate cycle.
+    if photo.immich_asset_id:
+        db.merge(DeletedImmichAsset(asset_id=photo.immich_asset_id))
     for rel in (photo.filename, photo.thumb_filename):
         if not rel:
             continue

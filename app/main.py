@@ -70,6 +70,10 @@ app = FastAPI(title="Augie's Plant Tracker", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
+# Cache-bust static assets on every restart so browsers don't serve stale
+# styles.css / justified-grid.js after a deploy.
+import time as _time
+templates.env.globals["asset_version"] = str(int(_time.time()))
 ui.templates = templates  # share the instance
 
 app.include_router(ui.router)

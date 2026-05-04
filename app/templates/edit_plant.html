@@ -126,8 +126,15 @@
     </div>
     <div class="field">
       <label class="label" for="f-common">Common name</label>
-      <input id="f-common" name="common_name" placeholder="Swiss cheese plant"
-             value="{{ (plant.common_name or '') if plant else request.query_params.get('common_name', '') }}">
+      <div class="lookup-row">
+        <input id="f-common" name="common_name" placeholder="Swiss cheese plant"
+               value="{{ (plant.common_name or '') if plant else request.query_params.get('common_name', '') }}">
+        <button type="button" class="btn-secondary" id="lookup-btn"
+                title="Ask Claude Haiku for species + care notes from this common name">
+          Lookup
+        </button>
+      </div>
+      <div class="hint" id="lookup-status" style="display:none;"></div>
     </div>
   </div>
 
@@ -135,9 +142,13 @@
     <div class="group-label">Where it lives</div>
     <div class="field">
       <label class="label" for="f-loc">Location</label>
-      <input id="f-loc" name="location" placeholder="Living room window"
-             value="{{ plant.location or '' if plant else (photo.imported_location if photo else '') }}">
+      <div class="loc-search-wrap">
+        <input id="f-loc" name="location" placeholder="Living room window" autocomplete="off"
+               value="{{ plant.location or '' if plant else (photo.imported_location if photo else '') }}">
+        <div class="loc-results" id="loc-results" hidden></div>
+      </div>
     </div>
+    <script id="locations-data" type="application/json">{{ (locations|default([]))|tojson }}</script>
     <div class="field-row">
       <div class="field">
         <label class="label" for="f-pot">Pot size</label>
@@ -171,6 +182,24 @@
     </div>
   </div>
 
+  {% if plant and plant.photos %}
+  <div class="field-group">
+    <div class="group-label">Photos · {{ plant.photos|length }}</div>
+    <p class="muted small" style="margin: 0 0 10px;">Tap × to permanently delete a photo. Useful for cleaning up duplicates.</p>
+    <div class="photo-manage-grid">
+      {% for p in plant.photos|reverse %}
+        <div class="photo-manage-tile" data-photo-id="{{ p.id }}">
+          {% if p.thumb_filename or p.filename %}
+            <img src="/media/{{ p.thumb_filename or p.filename }}" alt="" loading="lazy">
+          {% endif %}
+          <div class="photo-manage-date">{{ p.captured_at.strftime('%b %d, %Y') }}</div>
+          <button type="button" class="photo-manage-del" aria-label="Delete photo">&times;</button>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {% if plant %}
   <div class="danger-zone">
     <div class="group-label">Danger zone</div>
@@ -192,5 +221,128 @@
     {% if plant %}<a class="btn-secondary" href="/plants/{{ plant.id }}">Cancel</a>{% endif %}
   </div>
 </form>
+
+<script>
+(function () {
+  const btn = document.getElementById('lookup-btn');
+  if (!btn) return;
+  const common = document.getElementById('f-common');
+  const species = document.getElementById('f-species');
+  const care = document.getElementById('f-care');
+  const status = document.getElementById('lookup-status');
+
+  function setStatus(msg, isError) {
+    if (!msg) { status.style.display = 'none'; return; }
+    status.textContent = msg;
+    status.style.display = 'block';
+    status.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  }
+
+  btn.addEventListener('click', async () => {
+    const name = (common.value || '').trim();
+    if (!name) {
+      common.focus();
+      setStatus('Type a common name first.', true);
+      return;
+    }
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = 'Looking up…';
+    setStatus('Asking Claude Haiku…');
+    try {
+      const resp = await fetch('/api/plants/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ common_name: name }),
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const j = await resp.json();
+      if (j.species) species.value = j.species;
+      if (j.common_name) common.value = j.common_name;
+      if (j.care_notes) care.value = j.care_notes;
+      setStatus(j.species ? ('Filled from lookup: ' + j.species) : 'No match.');
+    } catch (err) {
+      setStatus('Lookup failed: ' + err.message, true);
+    } finally {
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
+
+  // Live-search dropdown on the Location field. Shows all known locations
+  // when empty/focused; filters as the user types. Clicking a row fills the
+  // input. Used to keep location strings consistent across plants.
+  (function () {
+    const input = document.getElementById('f-loc');
+    const dropdown = document.getElementById('loc-results');
+    const dataEl = document.getElementById('locations-data');
+    if (!input || !dropdown || !dataEl) return;
+    const locations = JSON.parse(dataEl.textContent || '[]');
+    if (!locations.length) return;
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function render(filterText) {
+      const q = (filterText || '').trim().toLowerCase();
+      const matches = q
+        ? locations.filter(l => l.name.toLowerCase().includes(q))
+        : locations.slice();
+      if (!matches.length) {
+        dropdown.innerHTML = '<div class="muted small" style="padding: 8px 10px;">No matching locations.</div>';
+        dropdown.hidden = false;
+        return;
+      }
+      dropdown.innerHTML = matches.map(l => {
+        const thumb = l.thumb ? '<img src="' + l.thumb + '" alt="">' : '';
+        return '<button type="button" class="loc-result-row" data-name="' + escapeHtml(l.name) + '">'
+          + '<div class="thumb">' + thumb + '</div>'
+          + '<div class="name">' + escapeHtml(l.name) + '</div>'
+          + '</button>';
+      }).join('');
+      dropdown.hidden = false;
+    }
+
+    input.addEventListener('focus', () => render(input.value));
+    input.addEventListener('input', () => render(input.value));
+    // Use mousedown (fires before blur) so the click registers before the
+    // dropdown hides itself on blur.
+    dropdown.addEventListener('mousedown', (e) => {
+      const row = e.target.closest('.loc-result-row');
+      if (!row) return;
+      e.preventDefault();
+      input.value = row.dataset.name || '';
+      dropdown.hidden = true;
+    });
+    input.addEventListener('blur', () => {
+      // Small delay so a click on a row can register first if mousedown
+      // didn't fire (e.g. touch devices).
+      setTimeout(() => { dropdown.hidden = true; }, 120);
+    });
+  })();
+
+  // Per-photo delete buttons in the Photos grid.
+  document.querySelectorAll('.photo-manage-del').forEach(delBtn => {
+    delBtn.addEventListener('click', async () => {
+      const tile = delBtn.closest('.photo-manage-tile');
+      if (!tile) return;
+      const photoId = tile.dataset.photoId;
+      if (!confirm('Delete this photo permanently? This cannot be undone.')) return;
+      delBtn.disabled = true;
+      try {
+        const resp = await fetch('/api/photos/' + photoId, { method: 'DELETE' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        tile.remove();
+      } catch (err) {
+        delBtn.disabled = false;
+        alert('Could not delete photo: ' + err.message);
+      }
+    });
+  });
+})();
+</script>
 
 {% endblock %}

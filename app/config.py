@@ -34,12 +34,33 @@ class Settings(BaseSettings):
     # CLIP smart-search queries. Comma-separated in env (the validator splits).
     # NoDecode disables pydantic-settings' default JSON parse for List fields.
     clip_queries: Annotated[List[str], NoDecode] = [
+        # Broad
         "houseplant",
         "potted plant indoors",
-        "succulent on a shelf",
-        "leafy green plant in a pot",
+        "indoor plant",
+        # Succulents / cacti
+        "succulent plant",
+        "cactus in a pot",
+        # Macro / close-up / unusual color
+        "close-up of a plant leaf",
+        "variegated plant leaf",
+        "small plant in a pot",
+        # Terrariums / planted scenes
+        "terrarium with plants",
+        "miniature indoor garden",
+        # Plant-care contexts
+        "plant under a grow light",
+        "plant cutting propagation",
+        "hanging plant indoors",
+        "flowering houseplant",
+        # Common species (CLIP handles these well)
+        "philodendron",
+        "monstera plant",
+        "pothos vine",
+        "snake plant",
+        "orchid in bloom",
     ]
-    clip_results_per_query: int = 50
+    clip_results_per_query: int = 25
     # Optional extra named geofences as a JSON array, e.g.
     # GEOFENCES='[{"name":"Mom and Dad","lat":42.04,"lon":-88.30,"radius_km":0.5}]'
     # Anything inside any geofence is imported and tagged with that location.

@@ -31,6 +31,26 @@ def _ctx(request: Request, db: Session, **extra) -> dict:
     }
 
 
+def _known_locations(db: Session) -> list[dict]:
+    """Distinct locations across all plants, each with a representative
+    thumbnail (newest photo from any plant in that location). Drives the
+    live-search dropdown on the Location field of both the new- and
+    edit-plant forms."""
+    loc_map: dict[str, str] = {}  # location -> thumb url (first / most-recent wins)
+    for p in db.query(Plant).all():
+        name = (p.location or "").strip()
+        if not name or name in loc_map:
+            continue
+        thumb = ""
+        if p.latest_photo and p.latest_photo.thumb_filename:
+            thumb = f"/media/{p.latest_photo.thumb_filename}"
+        loc_map[name] = thumb
+    return sorted(
+        ({"name": k, "thumb": v} for k, v in loc_map.items()),
+        key=lambda d: d["name"].lower(),
+    )
+
+
 def _form_to_plant_kwargs(
     nickname: str,
     species: Optional[str],
@@ -109,6 +129,7 @@ def new_plant_form(
             photo=photo,
             prefill_care_notes=prefill_care_notes,
             prefill_acquired_on=prefill_acquired_on,
+            locations=_known_locations(db),
         ),
     )
 
@@ -186,24 +207,6 @@ def edit_plant_form(plant_id: int, request: Request, db: Session = Depends(get_s
         (p.nickname or "").lower(),
     ))
 
-    # Distinct locations across all plants, each with a representative
-    # thumbnail (newest photo from any plant in that location). Drives the
-    # live-search dropdown on the Location field. Includes the current plant
-    # so its own location surfaces if it's the only one with that location.
-    loc_map: dict[str, str] = {}  # location -> thumb url (first / most-recent wins)
-    for p in db.query(Plant).all():
-        name = (p.location or "").strip()
-        if not name or name in loc_map:
-            continue
-        thumb = ""
-        if p.latest_photo and p.latest_photo.thumb_filename:
-            thumb = f"/media/{p.latest_photo.thumb_filename}"
-        loc_map[name] = thumb
-    locations = sorted(
-        ({"name": k, "thumb": v} for k, v in loc_map.items()),
-        key=lambda d: d["name"].lower(),
-    )
-
     return templates.TemplateResponse(
         "edit_plant.html",
         _ctx(
@@ -211,7 +214,7 @@ def edit_plant_form(plant_id: int, request: Request, db: Session = Depends(get_s
             plant=plant,
             action=f"/plants/{plant_id}/edit",
             other_plants=others,
-            locations=locations,
+            locations=_known_locations(db),
         ),
     )
 

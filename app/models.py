@@ -97,6 +97,26 @@ class Photo(Base):
     # a new plant from an inbox photo. NULL for manual uploads.
     imported_location: Mapped[Optional[str]] = mapped_column(String(120))
 
+    # Identification retry queue. NULL/empty = success or never attempted.
+    # "pending" = an attempt got a transient error (Claude rate-limited /
+    # overloaded / n8n 5xx); the daily worker in app.identify_retry will
+    # re-run identify on each row whose identify_next_attempt_at is past.
+    # "exhausted" = ran out of attempts; user has been notified.
+    identify_state: Mapped[Optional[str]] = mapped_column(String(16), index=True)
+    identify_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    identify_last_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    identify_next_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime, index=True)
+    identify_last_error: Mapped[Optional[str]] = mapped_column(String(64))
+
+    # Anthropic Message Batches (auto-sync only). When a Photo enters via the
+    # Immich auto-sync, sync.py sets identify_state='batched' and leaves the
+    # batch_id NULL. The batch worker (app.identify_batch) picks these up,
+    # submits them as one batch, stores the returned batch_id, then polls
+    # and applies the results. Manual UI uploads bypass this entirely — they
+    # go through the live n8n webhook for instant feedback.
+    identify_batch_id: Mapped[Optional[str]] = mapped_column(String(80), index=True)
+    identify_batch_submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
     plant: Mapped[Optional[Plant]] = relationship(back_populates="photos")
 
 

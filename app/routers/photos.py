@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from .. import imaging, n8n, storage
+from .. import identify_retry, imaging, n8n, storage
 from ..config import settings
 from ..database import get_session
 from ..models import DeletedImmichAsset, Photo, Plant
@@ -49,7 +49,8 @@ async def upload_photo(
 
     captured_at = imaging.extract_captured_at(saved) or datetime.utcnow()
 
-    ident = await n8n.identify(saved)
+    outcome = await n8n.identify(saved)
+    ident = outcome.result if outcome.status == "ok" else None
 
     plant: Optional[Plant] = None
     if plant_id is not None:
@@ -82,6 +83,10 @@ async def upload_photo(
     db.add(photo)
     db.commit()
     db.refresh(photo)
+
+    # Claude unreachable / rate-limited? Queue this photo for the daily retry.
+    if outcome.status == "retry":
+        identify_retry.mark_pending(photo.id, outcome.error or "retry")
 
     if plant is not None and ident is not None:
         if not plant.species and ident.species:

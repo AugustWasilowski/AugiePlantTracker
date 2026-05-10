@@ -22,7 +22,7 @@ from typing import Optional
 
 from sqlalchemy import select
 
-from . import imaging, n8n, storage
+from . import identify_batch, identify_retry, imaging, n8n, storage
 from .config import settings
 from .database import session_scope
 from .immich import ImmichClient
@@ -249,15 +249,26 @@ async def _run_full_sync() -> dict:
             )
             captured_at = _to_naive_utc(captured_at)
 
-            # Identify via the existing async n8n module (it handles compression
-            # and parses the response shape into IdentifyResult).
-            try:
-                ident = await n8n.identify(saved_path)
-            except Exception as e:
-                log.warning("identify failed for %s: %s", aid, e)
-                ident = None
+            # Identification path:
+            #  - If the Anthropic Batches API is configured, queue this photo
+            #    for the batch worker (50% off, async). app.identify_batch
+            #    submits + polls; results land in the same identified_* cols.
+            #  - Otherwise fall back to the live n8n webhook (two-tier
+            #    Haiku→Sonnet) and apply the result inline like before.
+            outcome: Optional[n8n.IdentifyOutcome] = None
+            if not identify_batch.enabled():
+                try:
+                    outcome = await n8n.identify(saved_path)
+                except Exception as e:
+                    log.warning("identify crashed for %s: %s", aid, e)
+                    outcome = n8n.IdentifyOutcome(status="retry", error=f"crash:{e.__class__.__name__}")
 
+            ident = outcome.result if (outcome and outcome.status == "ok") else None
             growth = ident.growth if ident else {}
+
+            # When the batch path is enabled we mark the row as 'batched' on
+            # creation so the batch worker picks it up on its next tick.
+            initial_state = "batched" if identify_batch.enabled() else None
 
             photo = Photo(
                 plant_id=None,
@@ -274,11 +285,23 @@ async def _run_full_sync() -> dict:
                 measured_leaf_count=growth.get("leaf_count"),
                 immich_asset_id=aid,
                 imported_location=matched_location,
+                identify_state=initial_state,
             )
             with session_scope() as sess:
                 sess.add(photo)
+                sess.flush()  # populate photo.id for any queue stamping
+                photo_id = photo.id
             inserted += 1
-            log.info("immich import: asset %s -> %s", aid, original_filename)
+            log.info(
+                "immich import: asset %s -> %s (%s)",
+                aid, original_filename,
+                "batched" if initial_state == "batched" else "live",
+            )
+
+            # Live-path transient failure → queue for daily retry (legacy
+            # fallback when the batch API isn't configured).
+            if outcome is not None and outcome.status == "retry":
+                identify_retry.mark_pending(photo_id, outcome.error or "retry")
 
     stats = {
         "queries": len(settings.clip_queries),

@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
     init_db()
 
     sync_task: asyncio.Task | None = None
+    retry_task: asyncio.Task | None = None
     if settings.immich_enabled and settings.sync_interval_minutes > 0:
         log.info(
             "Immich auto-import enabled: %s, every %d min",
@@ -53,15 +54,43 @@ async def lifespan(app: FastAPI):
     else:
         log.info("Immich auto-import disabled (set IMMICH_URL + IMMICH_API_KEY to enable)")
 
+    # Daily retry worker for photos whose identify call hit a transient
+    # error (Claude rate limit, n8n 5xx, low-confidence batch result, etc.).
+    from .identify_retry import worker_loop
+    retry_task = asyncio.create_task(worker_loop())
+    log.info(
+        "Identify retry worker started: max %d attempts, %dh between tries",
+        settings.identify_retry_max_attempts,
+        settings.identify_retry_interval_hours,
+    )
+
+    # Anthropic Batches workers (auto-sync only): one submits batches, the
+    # other polls in-flight ones. Both no-op if ANTHROPIC_API_KEY is unset.
+    batch_submit_task: asyncio.Task | None = None
+    batch_poll_task: asyncio.Task | None = None
+    from .identify_batch import enabled as batch_enabled, submit_loop, poll_loop
+    if batch_enabled():
+        batch_submit_task = asyncio.create_task(submit_loop())
+        batch_poll_task = asyncio.create_task(poll_loop())
+        log.info(
+            "Anthropic Batches enabled: submit every %dm, poll every %dm, %s model",
+            settings.batch_submit_interval_minutes,
+            settings.batch_poll_interval_minutes,
+            settings.anthropic_batch_model,
+        )
+    else:
+        log.info("Anthropic Batches disabled (ANTHROPIC_API_KEY blank) — auto-sync uses live n8n webhook")
+
     try:
         yield
     finally:
-        if sync_task is not None:
-            sync_task.cancel()
-            try:
-                await sync_task
-            except asyncio.CancelledError:
-                pass
+        for t in (sync_task, retry_task, batch_submit_task, batch_poll_task):
+            if t is not None:
+                t.cancel()
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
 
 
 app = FastAPI(title="Augie's Plant Tracker", lifespan=lifespan)

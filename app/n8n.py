@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Optional
 
 import httpx
 
@@ -43,11 +44,39 @@ class IdentifyResult(dict):
         return g if isinstance(g, dict) else {}
 
 
-async def identify(image_path: Path) -> IdentifyResult | None:
-    """POST the image to n8n and return parsed result, or None if disabled / failed."""
+IdentifyStatus = Literal["ok", "retry", "permanent", "skipped"]
+
+
+@dataclass
+class IdentifyOutcome:
+    """Result of one identify attempt.
+
+    - ``ok``: ``result`` is an IdentifyResult (possibly with confidence=0 if
+      Claude looked but couldn't tell — that's a final answer, not a failure).
+    - ``retry``: transient failure (HTTP 429/5xx, timeout, connect error,
+      n8n hit an Anthropic rate limit / overload). Caller should re-queue.
+    - ``permanent``: non-retryable (e.g. image couldn't be encoded). The
+      caller shouldn't keep banging on this one.
+    - ``skipped``: identify is disabled or no webhook URL configured.
+    """
+
+    status: IdentifyStatus
+    result: Optional[IdentifyResult] = None
+    error: Optional[str] = None  # short tag for logs / DB, e.g. "http_429"
+
+
+# HTTP status codes from n8n that mean "Claude was unreachable / rate-limited
+# / overloaded; try again later." 429 = rate limit; 529 = Anthropic overloaded;
+# 5xx = generic server error (the workflow itself failing reaches the caller
+# as 500 from n8n since the Anthropic node throws before the Respond node).
+_RETRY_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504, 522, 524, 529}
+
+
+async def identify(image_path: Path) -> IdentifyOutcome:
+    """POST the image to n8n and return a structured outcome."""
     if settings.disable_identify or not settings.n8n_identify_webhook_url:
         log.info("Identify disabled or webhook not set; skipping.")
-        return None
+        return IdentifyOutcome(status="skipped")
 
     headers = {}
     if settings.n8n_webhook_token:
@@ -57,7 +86,7 @@ async def identify(image_path: Path) -> IdentifyResult | None:
         payload = imaging.make_identify_payload(image_path)
     except Exception as e:
         log.warning("Could not encode %s for identify: %s", image_path, e)
-        return None
+        return IdentifyOutcome(status="permanent", error=f"encode:{e.__class__.__name__}")
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -67,20 +96,37 @@ async def identify(image_path: Path) -> IdentifyResult | None:
                 files=files,
                 headers=headers,
             )
-        resp.raise_for_status()
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
+        log.warning("n8n identify network error: %s", e)
+        return IdentifyOutcome(status="retry", error=f"net:{e.__class__.__name__}")
     except httpx.HTTPError as e:
-        log.warning("n8n identify call failed: %s", e)
-        return None
+        log.warning("n8n identify HTTP error: %s", e)
+        return IdentifyOutcome(status="retry", error=f"http:{e.__class__.__name__}")
+
+    if resp.status_code in _RETRY_STATUS_CODES:
+        log.warning("n8n identify returned %d — will retry", resp.status_code)
+        return IdentifyOutcome(status="retry", error=f"http_{resp.status_code}")
+    if resp.status_code >= 400:
+        log.warning("n8n identify returned %d (not retryable)", resp.status_code)
+        return IdentifyOutcome(status="permanent", error=f"http_{resp.status_code}")
 
     try:
         data = resp.json()
     except json.JSONDecodeError:
         log.warning("n8n returned non-JSON: %r", resp.text[:200])
-        return None
+        return IdentifyOutcome(status="retry", error="bad_json")
 
     # n8n often wraps single results in an array — unwrap.
     if isinstance(data, list) and data:
         data = data[0]
     if not isinstance(data, dict):
-        return None
-    return IdentifyResult(data)
+        return IdentifyOutcome(status="retry", error="bad_shape")
+
+    # If the Parse Plant JSON node failed to parse Claude's reply, it emits a
+    # `_parse_error` field. That's likely a Claude-side issue (truncation,
+    # rate-limit fallback message, etc.) — worth retrying.
+    if data.get("_parse_error"):
+        log.warning("n8n parse error in identify response: %s", data.get("_parse_error"))
+        return IdentifyOutcome(status="retry", error="parse_error")
+
+    return IdentifyOutcome(status="ok", result=IdentifyResult(data))

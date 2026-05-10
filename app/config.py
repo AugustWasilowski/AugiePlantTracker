@@ -15,6 +15,39 @@ class Settings(BaseSettings):
     n8n_lookup_webhook_url: str = ""
     n8n_chat_webhook_url: str = ""
     n8n_webhook_token: str = ""
+    # Telegram notification webhook used when identification retries run out.
+    # Posts JSON {"text": "..."} with header X-Webhook-Secret. If either is
+    # blank, exhausted-retry notifications are logged but not sent.
+    n8n_telegram_webhook_url: str = ""
+    n8n_telegram_webhook_secret: str = ""
+    # Optional Piper-TTS announce-home webhook (n8n workflow pdTyyYrvIpVbaRw4).
+    # If set, the retry worker speaks a short message through the house
+    # speakers alongside the Telegram message when retries exhaust. No auth
+    # required on the n8n side.
+    n8n_announce_webhook_url: str = ""
+
+    # ---- Anthropic Message Batches (auto-sync uses this, 50% cheaper) ----
+    # Direct API key for plant-tracker to call Anthropic's Batches API. Same
+    # key that's in n8n's `anthropicApi` credential. Leave blank to disable
+    # the batch path — auto-sync will fall back to the live n8n webhook.
+    anthropic_api_key: str = ""
+    # Model to use for batch identification (the Haiku-only triage tier).
+    anthropic_batch_model: str = "claude-haiku-4-5-20251001"
+    # How often the batch worker wakes up to (a) submit pending photos as a
+    # new batch and (b) poll the status of any in-flight batches.
+    batch_submit_interval_minutes: int = 5
+    batch_poll_interval_minutes: int = 2
+    # Max photos per batch submission. Anthropic allows up to 100k requests
+    # per batch; we cap much lower so a botched batch doesn't poison too much.
+    batch_max_photos_per_submission: int = 100
+    # Once a photo has been in the 'batched' state for this long with no
+    # result, give up on the batch and fall back to the live retry path.
+    # Anthropic's batch SLA is 24h but typically results land in <1h.
+    batch_max_wait_hours: int = 6
+    # Identify retry queue policy.
+    identify_retry_max_attempts: int = 3        # 3 daily retries before giving up
+    identify_retry_interval_hours: int = 24     # wait this long between retries
+    identify_retry_worker_minutes: int = 60     # how often the worker wakes up
     # Public origin used to build absolute photo URLs sent to n8n (so the
     # Anthropic API can fetch the image). Falls back to the request's host.
     public_base_url: str = ""

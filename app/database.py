@@ -59,6 +59,43 @@ def _migrate_sqlite() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE photos ADD COLUMN imported_location VARCHAR(120)"
             )
+        if "identify_state" not in photo_cols:
+            log.info("Adding photos.identify_* retry-queue columns")
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_state VARCHAR(16)"
+            )
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_last_attempt_at DATETIME"
+            )
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_next_attempt_at DATETIME"
+            )
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_last_error VARCHAR(64)"
+            )
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_photos_identify_state "
+                "ON photos (identify_state)"
+            )
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_photos_identify_next_attempt_at "
+                "ON photos (identify_next_attempt_at)"
+            )
+        if "identify_batch_id" not in photo_cols:
+            log.info("Adding photos.identify_batch_* columns")
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_batch_id VARCHAR(80)"
+            )
+            conn.exec_driver_sql(
+                "ALTER TABLE photos ADD COLUMN identify_batch_submitted_at DATETIME"
+            )
+            conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_photos_identify_batch_id "
+                "ON photos (identify_batch_id)"
+            )
 
 
 def init_db() -> None:
